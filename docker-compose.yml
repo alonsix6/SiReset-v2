@@ -1,0 +1,52 @@
+# docker-compose.yml para desarrollo local
+version: '3.8'
+
+services:
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://sireset:sireset123@db:5432/sireset
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - ENVIRONMENT=development
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
+    volumes:
+      - ./backend/app:/app/app
+      - ./data:/app/data
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # PostgreSQL Database (reemplaza SQLite)
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=sireset
+      - POSTGRES_PASSWORD=sireset123
+      - POSTGRES_DB=sireset
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Frontend React (opcional para desarrollo)
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile.dev
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./frontend:/app
+  #   environment:
+  #     - REACT_APP_API_URL=http://localhost:8080/api
+  #   depends_on:
+  #     - backend
+
+volumes:
+  postgres_data:
