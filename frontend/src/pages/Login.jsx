@@ -1,29 +1,65 @@
-import { useState } from 'react'
-import axios from 'axios'
+import { useEffect } from 'react'
+import { Auth } from '@supabase/auth-ui-react'
+import { ThemeSupa } from '@supabase/auth-ui-shared'
+import { supabase } from '../lib/supabaseClient'
+import { useNavigate } from 'react-router-dom'
 
 export default function Login({ onLogin }) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+  useEffect(() => {
+    // Verificar sesión actual
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        handleSession(session)
+      }
+    })
 
+    // Escuchar cambios de autenticación
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event:', event)
+
+      if (event === 'SIGNED_IN' && session) {
+        handleSession(session)
+      } else if (event === 'SIGNED_OUT') {
+        // Limpiar estado local
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleSession = async (session) => {
     try {
-      const formData = new FormData()
-      formData.append('username', email)
-      formData.append('password', password)
+      // Obtener datos del usuario desde Supabase
+      const { data: { user } } = await supabase.auth.getUser()
 
-      const response = await axios.post('/api/auth/login', formData)
+      if (user) {
+        // Estructura de usuario compatible con el sistema existente
+        const userData = {
+          id: user.id,
+          email: user.email,
+          name: user.user_metadata?.name || user.user_metadata?.full_name || user.email,
+          role: user.user_metadata?.role || 'user',
+          active: true,
+          modules: user.user_metadata?.modules || ['Mougli', 'Mapito']
+        }
 
-      onLogin(response.data.user, response.data.access_token)
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Error al iniciar sesión')
-    } finally {
-      setLoading(false)
+        // Token JWT de Supabase
+        const token = session.access_token
+
+        // Llamar al callback onLogin del componente padre
+        onLogin(userData, token)
+
+        // Navegar al dashboard
+        navigate('/')
+      }
+    } catch (error) {
+      console.error('Error obteniendo datos del usuario:', error)
     }
   }
 
@@ -35,52 +71,69 @@ export default function Login({ onLogin }) {
           <p className="text-gray-600">Suite de Herramientas para Reset</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="tu@email.com"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Contraseña
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-          </button>
-        </form>
+        {/* Supabase Auth UI Component */}
+        <Auth
+          supabaseClient={supabase}
+          appearance={{
+            theme: ThemeSupa,
+            variables: {
+              default: {
+                colors: {
+                  brand: '#5f48c6',
+                  brandAccent: '#4c3ba6',
+                }
+              }
+            },
+            className: {
+              container: 'auth-container',
+              button: 'auth-button',
+              input: 'auth-input',
+            }
+          }}
+          providers={['google']}
+          localization={{
+            variables: {
+              sign_in: {
+                email_label: 'Email',
+                password_label: 'Contraseña',
+                email_input_placeholder: 'tu@email.com',
+                password_input_placeholder: '••••••••',
+                button_label: 'Iniciar Sesión',
+                loading_button_label: 'Iniciando sesión...',
+                social_provider_text: 'Iniciar sesión con {{provider}}',
+                link_text: '¿Ya tienes una cuenta? Inicia sesión',
+              },
+              sign_up: {
+                email_label: 'Email',
+                password_label: 'Contraseña',
+                email_input_placeholder: 'tu@email.com',
+                password_input_placeholder: '••••••••',
+                button_label: 'Registrarse',
+                loading_button_label: 'Registrando...',
+                social_provider_text: 'Registrarse con {{provider}}',
+                link_text: '¿No tienes cuenta? Regístrate',
+              },
+              forgotten_password: {
+                email_label: 'Email',
+                password_label: 'Contraseña',
+                email_input_placeholder: 'tu@email.com',
+                button_label: 'Enviar instrucciones',
+                loading_button_label: 'Enviando...',
+                link_text: '¿Olvidaste tu contraseña?',
+              },
+              update_password: {
+                password_label: 'Nueva contraseña',
+                password_input_placeholder: '••••••••',
+                button_label: 'Actualizar contraseña',
+                loading_button_label: 'Actualizando...',
+              },
+            },
+          }}
+          redirectTo={`${window.location.origin}/`}
+        />
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          SiReset v2.0 - Powered by FastAPI + React
+          SiReset v2.0 - Powered by Supabase + React
         </p>
       </div>
     </div>
