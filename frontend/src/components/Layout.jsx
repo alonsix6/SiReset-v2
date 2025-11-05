@@ -7,11 +7,17 @@ export default function Layout({ user, onLogout, children }) {
     { name: 'Dashboard', path: '/', icon: '🏠' },
     { name: 'Mougli', path: '/mougli', icon: '📊', module: 'Mougli' },
     { name: 'Mapito', path: '/mapito', icon: '🗺️', module: 'Mapito' },
+    { name: 'Admin', path: '/admin', icon: '⚙️', adminOnly: true },
   ]
 
-  const visibleNav = navigation.filter(item =>
-    !item.module || user.role === 'admin' || user.modules.includes(item.module)
-  )
+  const visibleNav = navigation.filter(item => {
+    // Admin menu only for admin users
+    if (item.adminOnly) {
+      return user.role === 'admin'
+    }
+    // Module-based filtering
+    return !item.module || user.role === 'admin' || user.modules.includes(item.module)
+  })
 
   return (
     <div className="min-h-screen bg-gray-50">
