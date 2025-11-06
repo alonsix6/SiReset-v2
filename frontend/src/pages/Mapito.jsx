@@ -1,85 +1,637 @@
+import { useState, useEffect, useRef } from 'react'
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
+import { toPng } from 'html-to-image'
+import 'leaflet/dist/leaflet.css'
+
+// Componente para ajustar el zoom del mapa
+function FitBounds({ bounds }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (bounds && bounds.length > 0) {
+      map.fitBounds(bounds)
+    }
+  }, [bounds, map])
+
+  return null
+}
+
 export default function Mapito({ user }) {
+  // Estado del mapa
+  const [nivel, setNivel] = useState('regiones')
+  const [geoData, setGeoData] = useState(null)
+  const [selectedRegions, setSelectedRegions] = useState([])
+  const [availableRegions, setAvailableRegions] = useState([])
+  const [availableProvinces, setAvailableProvinces] = useState([])
+  const [selectedProvinces, setSelectedProvinces] = useState([])
+  const [selectedDistricts, setSelectedDistricts] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  // Estado de colores y estilos
+  const [colorGeneral, setColorGeneral] = useState('#713030')
+  const [colorSelected, setColorSelected] = useState('#5F48C6')
+  const [colorBorder, setColorBorder] = useState('#000000')
+  const [grosorBorde, setGrosorBorde] = useState(0.8)
+  const [showBorders, setShowBorders] = useState(true)
+  const [showBasemap, setShowBasemap] = useState(true)
+
+  // Refs
+  const mapRef = useRef(null)
+  const mapContainerRef = useRef(null)
+
+  // Bounds para fitBounds
+  const [mapBounds, setMapBounds] = useState(null)
+
+  // Cargar datos GeoJSON según el nivel
+  useEffect(() => {
+    loadGeoData()
+  }, [nivel])
+
+  // Cargar lista de regiones disponibles
+  useEffect(() => {
+    fetch('/data/gadm41_PER_1.json')
+      .then(res => res.json())
+      .then(data => {
+        const regions = data.features.map(f => f.properties.NAME_1).sort()
+        setAvailableRegions(regions)
+      })
+      .catch(err => console.error('Error cargando regiones:', err))
+  }, [])
+
+  // Cargar provincias cuando se selecciona una región
+  useEffect(() => {
+    if (selectedRegions.length > 0 && nivel === 'provincias') {
+      fetch('/data/gadm41_PER_2.json')
+        .then(res => res.json())
+        .then(data => {
+          const provinces = data.features
+            .filter(f => selectedRegions.includes(f.properties.NAME_1))
+            .map(f => ({
+              name: f.properties.NAME_2,
+              region: f.properties.NAME_1
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+          setAvailableProvinces(provinces)
+        })
+        .catch(err => console.error('Error cargando provincias:', err))
+    } else {
+      setAvailableProvinces([])
+    }
+  }, [selectedRegions, nivel])
+
+  const loadGeoData = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      let filename
+      switch (nivel) {
+        case 'regiones':
+          filename = 'gadm41_PER_1.json'
+          break
+        case 'provincias':
+          filename = 'gadm41_PER_2.json'
+          break
+        case 'distritos':
+          filename = 'gadm41_PER_3.json'
+          break
+        default:
+          filename = 'gadm41_PER_1.json'
+      }
+
+      const response = await fetch(`/data/${filename}`)
+      if (!response.ok) throw new Error('Error cargando datos del mapa')
+
+      const data = await response.json()
+      setGeoData(data)
+
+      // Calcular bounds
+      if (data.features.length > 0) {
+        const allCoords = []
+        data.features.forEach(feature => {
+          if (feature.geometry.type === 'Polygon') {
+            feature.geometry.coordinates[0].forEach(coord => {
+              allCoords.push([coord[1], coord[0]]) // Leaflet usa [lat, lng]
+            })
+          } else if (feature.geometry.type === 'MultiPolygon') {
+            feature.geometry.coordinates.forEach(polygon => {
+              polygon[0].forEach(coord => {
+                allCoords.push([coord[1], coord[0]])
+              })
+            })
+          }
+        })
+
+        if (allCoords.length > 0) {
+          const lats = allCoords.map(c => c[0])
+          const lngs = allCoords.map(c => c[1])
+          setMapBounds([
+            [Math.min(...lats), Math.min(...lngs)],
+            [Math.max(...lats), Math.max(...lngs)]
+          ])
+        }
+      }
+
+    } catch (err) {
+      setError(err.message)
+      console.error('Error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Función para determinar si un feature está seleccionado
+  const isSelected = (feature) => {
+    const props = feature.properties
+
+    switch (nivel) {
+      case 'regiones':
+        return selectedRegions.includes(props.NAME_1)
+      case 'provincias':
+        return selectedProvinces.some(p =>
+          p.region === props.NAME_1 && p.name === props.NAME_2
+        )
+      case 'distritos':
+        return selectedDistricts.some(d =>
+          d.region === props.NAME_1 &&
+          d.province === props.NAME_2 &&
+          d.name === props.NAME_3
+        )
+      default:
+        return false
+    }
+  }
+
+  // Estilo de cada feature
+  const getFeatureStyle = (feature) => {
+    const selected = isSelected(feature)
+    return {
+      fillColor: selected ? colorSelected : colorGeneral,
+      fillOpacity: selected ? 0.95 : 0.85,
+      color: showBorders ? colorBorder : (selected ? colorSelected : colorGeneral),
+      weight: showBorders ? grosorBorde : 0,
+    }
+  }
+
+  // Handler para cada feature
+  const onEachFeature = (feature, layer) => {
+    const props = feature.properties
+    let tooltipContent = ''
+
+    if (props.NAME_1) tooltipContent += `<strong>Región:</strong> ${props.NAME_1}<br/>`
+    if (props.NAME_2) tooltipContent += `<strong>Provincia:</strong> ${props.NAME_2}<br/>`
+    if (props.NAME_3) tooltipContent += `<strong>Distrito:</strong> ${props.NAME_3}`
+
+    if (tooltipContent) {
+      layer.bindTooltip(tooltipContent, {
+        sticky: true,
+        className: 'custom-tooltip'
+      })
+    }
+
+    // Click handler para seleccionar/deseleccionar
+    layer.on('click', () => {
+      if (nivel === 'regiones') {
+        const regionName = props.NAME_1
+        setSelectedRegions(prev =>
+          prev.includes(regionName)
+            ? prev.filter(r => r !== regionName)
+            : [...prev, regionName]
+        )
+      } else if (nivel === 'provincias') {
+        const province = { region: props.NAME_1, name: props.NAME_2 }
+        setSelectedProvinces(prev => {
+          const exists = prev.some(p => p.region === province.region && p.name === province.name)
+          return exists
+            ? prev.filter(p => !(p.region === province.region && p.name === province.name))
+            : [...prev, province]
+        })
+      } else if (nivel === 'distritos') {
+        const district = { region: props.NAME_1, province: props.NAME_2, name: props.NAME_3 }
+        setSelectedDistricts(prev => {
+          const exists = prev.some(d =>
+            d.region === district.region &&
+            d.province === district.province &&
+            d.name === district.name
+          )
+          return exists
+            ? prev.filter(d => !(
+                d.region === district.region &&
+                d.province === district.province &&
+                d.name === district.name
+              ))
+            : [...prev, district]
+        })
+      }
+    })
+
+    // Hover effects
+    layer.on('mouseover', () => {
+      layer.setStyle({
+        weight: grosorBorde + 1,
+        fillOpacity: 1
+      })
+    })
+
+    layer.on('mouseout', () => {
+      layer.setStyle(getFeatureStyle(feature))
+    })
+  }
+
+  // Exportar a PNG
+  const exportToPng = async () => {
+    if (!mapContainerRef.current) return
+
+    try {
+      const dataUrl = await toPng(mapContainerRef.current, {
+        quality: 1.0,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff'
+      })
+
+      const link = document.createElement('a')
+      link.download = `mapa-peru-${nivel}-${Date.now()}.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      console.error('Error exportando mapa:', err)
+      alert('Error al exportar el mapa. Por favor, intenta nuevamente.')
+    }
+  }
+
+  // Limpiar selecciones
+  const clearSelections = () => {
+    setSelectedRegions([])
+    setSelectedProvinces([])
+    setSelectedDistricts([])
+  }
+
+  // Resetear colores a valores por defecto
+  const resetColors = () => {
+    setColorGeneral('#713030')
+    setColorSelected('#5F48C6')
+    setColorBorder('#000000')
+    setGrosorBorde(0.8)
+    setShowBorders(true)
+    setShowBasemap(true)
+  }
+
   return (
     <div className="section-reset">
-      <div className="container-reset max-w-4xl">
+      <div className="container-reset max-w-full px-4">
         {/* Header */}
-        <div className="mb-8 lg:mb-12 animate-fade-in-up">
-          <div className="inline-block mb-3">
+        <div className="mb-6 animate-fade-in-up">
+          <div className="inline-block mb-2">
             <span className="text-reset-neon text-xs sm:text-sm font-bold uppercase tracking-wider">
-              // MÓDULO DE MAPAS
+              // MÓDULO DE MAPAS INTERACTIVOS
             </span>
           </div>
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl xl:text-6xl text-reset-white mb-3 lg:mb-4 leading-tight">
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl text-reset-white mb-2 leading-tight">
             <span className="text-gradient-neon">MAPITO</span>
           </h1>
-          <p className="text-reset-gray-light text-base lg:text-lg">
-            Mapas interactivos de Perú
+          <p className="text-reset-gray-light text-base">
+            Crea y personaliza mapas de Perú - Exporta en PNG
           </p>
         </div>
 
-        {/* Coming Soon Card */}
-        <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <div className="text-center py-16">
-            {/* Icon */}
-            <div className="mb-8 relative inline-block">
-              <div className="w-32 h-32 bg-gradient-to-br from-reset-neon to-green-400 rounded-full flex items-center justify-center mx-auto">
-                <div className="absolute inset-0 bg-reset-black opacity-40 rounded-full"></div>
-                <span className="relative z-10 text-7xl">🗺️</span>
-              </div>
-              <div className="absolute -bottom-2 -right-2 w-16 h-16 border-4 border-reset-neon rounded-full opacity-20"></div>
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Panel de Control */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* Nivel de Mapa */}
+            <div className="card-reset-shadow animate-fade-in-up">
+              <h3 className="text-reset-white font-semibold mb-3 uppercase tracking-wide flex items-center">
+                <span className="text-reset-neon mr-2">📊</span>
+                Nivel del Mapa
+              </h3>
+              <select
+                value={nivel}
+                onChange={(e) => {
+                  setNivel(e.target.value)
+                  clearSelections()
+                }}
+                className="w-full bg-reset-gray-dark border border-reset-gray-medium rounded-reset px-3 py-2 text-reset-white focus:outline-none focus:border-reset-neon"
+              >
+                <option value="regiones">Regiones</option>
+                <option value="provincias">Provincias</option>
+                <option value="distritos">Distritos</option>
+              </select>
             </div>
 
-            {/* Title */}
-            <h2 className="font-display text-4xl text-reset-white mb-4 uppercase">
-              Próximamente
-            </h2>
+            {/* Selecciones */}
+            <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+              <h3 className="text-reset-white font-semibold mb-3 uppercase tracking-wide flex items-center">
+                <span className="text-reset-cyan mr-2">📍</span>
+                Selecciones
+              </h3>
 
-            {/* Description */}
-            <p className="text-reset-gray-light text-lg max-w-2xl mx-auto mb-8 leading-relaxed">
-              La funcionalidad de mapas interactivos estará disponible próximamente.
-              Podrás visualizar <span className="text-reset-neon font-semibold">regiones</span>, <span className="text-reset-neon font-semibold">provincias</span> y <span className="text-reset-neon font-semibold">distritos</span> de Perú con datos personalizados.
-            </p>
+              {nivel === 'regiones' && (
+                <div>
+                  <label className="text-reset-gray-light text-sm mb-2 block">
+                    Regiones ({selectedRegions.length} seleccionadas)
+                  </label>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {availableRegions.map(region => (
+                      <label key={region} className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-reset-gray-dark p-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={selectedRegions.includes(region)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRegions([...selectedRegions, region])
+                            } else {
+                              setSelectedRegions(selectedRegions.filter(r => r !== region))
+                            }
+                          }}
+                          className="form-checkbox text-reset-neon"
+                        />
+                        <span className="text-reset-gray-light">{region}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            {/* Features Preview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12">
-              <div className="bg-reset-gray-dark border border-reset-gray-medium rounded-reset p-4">
-                <div className="text-reset-neon text-2xl mb-2">📍</div>
-                <div className="text-reset-white font-semibold mb-1">Geolocalización</div>
-                <div className="text-reset-gray-light text-sm">Ubicación precisa de regiones</div>
+              {nivel === 'provincias' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-reset-gray-light text-sm mb-2 block">
+                      Regiones base
+                    </label>
+                    <select
+                      multiple
+                      value={selectedRegions}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value)
+                        setSelectedRegions(selected)
+                        setSelectedProvinces([])
+                      }}
+                      className="w-full bg-reset-gray-dark border border-reset-gray-medium rounded-reset px-3 py-2 text-reset-white focus:outline-none focus:border-reset-neon text-sm"
+                      size="4"
+                    >
+                      {availableRegions.map(region => (
+                        <option key={region} value={region}>{region}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-reset-gray-light mt-1">Mantén Ctrl/Cmd para seleccionar múltiples</p>
+                  </div>
+
+                  {availableProvinces.length > 0 && (
+                    <div>
+                      <label className="text-reset-gray-light text-sm mb-2 block">
+                        Provincias ({selectedProvinces.length})
+                      </label>
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {availableProvinces.map(prov => (
+                          <label key={`${prov.region}-${prov.name}`} className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-reset-gray-dark p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedProvinces.some(p => p.region === prov.region && p.name === prov.name)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedProvinces([...selectedProvinces, prov])
+                                } else {
+                                  setSelectedProvinces(selectedProvinces.filter(p =>
+                                    !(p.region === prov.region && p.name === prov.name)
+                                  ))
+                                }
+                              }}
+                              className="form-checkbox text-reset-neon"
+                            />
+                            <span className="text-reset-gray-light text-xs">{prov.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={clearSelections}
+                className="mt-3 w-full px-3 py-2 bg-reset-gray-dark border border-reset-gray-medium text-reset-gray-light rounded-reset hover:border-reset-red hover:text-reset-red transition-colors text-sm"
+              >
+                Limpiar Selecciones
+              </button>
+            </div>
+
+            {/* Colores */}
+            <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+              <h3 className="text-reset-white font-semibold mb-3 uppercase tracking-wide flex items-center">
+                <span className="text-reset-purple mr-2">🎨</span>
+                Personalización
+              </h3>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-reset-gray-light text-sm mb-1 block">Color General</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="color"
+                      value={colorGeneral}
+                      onChange={(e) => setColorGeneral(e.target.value)}
+                      className="w-10 h-10 rounded cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={colorGeneral}
+                      onChange={(e) => setColorGeneral(e.target.value)}
+                      className="flex-1 bg-reset-gray-dark border border-reset-gray-medium rounded px-2 py-1 text-reset-white text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-reset-gray-light text-sm mb-1 block">Color Seleccionado</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="color"
+                      value={colorSelected}
+                      onChange={(e) => setColorSelected(e.target.value)}
+                      className="w-10 h-10 rounded cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={colorSelected}
+                      onChange={(e) => setColorSelected(e.target.value)}
+                      className="flex-1 bg-reset-gray-dark border border-reset-gray-medium rounded px-2 py-1 text-reset-white text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-reset-gray-light text-sm mb-1 block">Color Bordes</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="color"
+                      value={colorBorder}
+                      onChange={(e) => setColorBorder(e.target.value)}
+                      className="w-10 h-10 rounded cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={colorBorder}
+                      onChange={(e) => setColorBorder(e.target.value)}
+                      className="flex-1 bg-reset-gray-dark border border-reset-gray-medium rounded px-2 py-1 text-reset-white text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-reset-gray-light text-sm mb-1 block">
+                    Grosor de Borde ({grosorBorde}px)
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={grosorBorde}
+                    onChange={(e) => setGrosorBorde(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="showBorders"
+                    checked={showBorders}
+                    onChange={(e) => setShowBorders(e.target.checked)}
+                    className="form-checkbox text-reset-neon"
+                  />
+                  <label htmlFor="showBorders" className="text-reset-gray-light text-sm cursor-pointer">
+                    Mostrar Bordes
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="showBasemap"
+                    checked={showBasemap}
+                    onChange={(e) => setShowBasemap(e.target.checked)}
+                    className="form-checkbox text-reset-neon"
+                  />
+                  <label htmlFor="showBasemap" className="text-reset-gray-light text-sm cursor-pointer">
+                    Mostrar Mapa Base
+                  </label>
+                </div>
+
+                <button
+                  onClick={resetColors}
+                  className="w-full px-3 py-2 bg-reset-gray-dark border border-reset-gray-medium text-reset-gray-light rounded-reset hover:border-reset-purple hover:text-reset-purple transition-colors text-sm"
+                >
+                  Resetear Colores
+                </button>
               </div>
-              <div className="bg-reset-gray-dark border border-reset-gray-medium rounded-reset p-4">
-                <div className="text-reset-cyan text-2xl mb-2">📊</div>
-                <div className="text-reset-white font-semibold mb-1">Visualización</div>
-                <div className="text-reset-gray-light text-sm">Datos interactivos en el mapa</div>
-              </div>
-              <div className="bg-reset-gray-dark border border-reset-gray-medium rounded-reset p-4">
-                <div className="text-reset-purple text-2xl mb-2">🎨</div>
-                <div className="text-reset-white font-semibold mb-1">Personalización</div>
-                <div className="text-reset-gray-light text-sm">Colores y métricas customizables</div>
+            </div>
+
+            {/* Exportar */}
+            <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+              <button
+                onClick={exportToPng}
+                disabled={loading || !geoData}
+                className="w-full px-4 py-3 bg-gradient-to-r from-reset-neon to-green-400 text-reset-black font-bold rounded-reset hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                📥 Descargar PNG
+              </button>
+            </div>
+
+            {/* Info */}
+            <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+              <div className="text-reset-gray-light text-xs space-y-2">
+                <p><strong className="text-reset-neon">Tip:</strong> Haz clic en el mapa para seleccionar regiones</p>
+                <p><strong className="text-reset-cyan">Zoom:</strong> Scroll del mouse o botones +/-</p>
+                <p><strong className="text-reset-purple">Pan:</strong> Arrastra el mapa</p>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Info Card */}
-        <div className="mt-8 bg-reset-gray-dark border-l-4 border-reset-purple rounded-reset p-6 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          <div className="flex items-start space-x-4">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-reset-purple bg-opacity-20 rounded-full flex items-center justify-center">
-                <span className="text-reset-purple text-xl">🔔</span>
+          {/* Mapa */}
+          <div className="lg:col-span-3">
+            <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+              <div ref={mapContainerRef} className="w-full" style={{ height: '700px' }}>
+                {loading && (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-reset-neon text-lg">Cargando mapa...</div>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-reset-red">Error: {error}</div>
+                  </div>
+                )}
+
+                {!loading && !error && geoData && (
+                  <MapContainer
+                    ref={mapRef}
+                    center={[-9.2, -75.0]}
+                    zoom={5}
+                    style={{ height: '100%', width: '100%', background: '#1a1a1a' }}
+                    className="rounded-reset"
+                  >
+                    {showBasemap && (
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                    )}
+
+                    <GeoJSON
+                      key={`${nivel}-${selectedRegions.join(',')}-${selectedProvinces.map(p => p.name).join(',')}-${colorGeneral}-${colorSelected}-${colorBorder}-${grosorBorde}-${showBorders}`}
+                      data={geoData}
+                      style={getFeatureStyle}
+                      onEachFeature={onEachFeature}
+                    />
+
+                    {mapBounds && <FitBounds bounds={mapBounds} />}
+                  </MapContainer>
+                )}
               </div>
-            </div>
-            <div>
-              <h3 className="text-reset-white font-semibold mb-2 uppercase tracking-wide">
-                Notificaciones
-              </h3>
-              <p className="text-reset-gray-light text-sm">
-                Te notificaremos cuando este módulo esté disponible. Mientras tanto, puedes seguir usando los demás módulos de la plataforma.
-              </p>
             </div>
           </div>
         </div>
       </div>
+
+      {/* CSS personalizado para tooltips */}
+      <style>{`
+        .custom-tooltip {
+          background-color: rgba(26, 26, 26, 0.95) !important;
+          border: 1px solid #00FF94 !important;
+          color: #ffffff !important;
+          padding: 8px 12px !important;
+          border-radius: 4px !important;
+          font-size: 12px !important;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .leaflet-container {
+          font-family: inherit;
+        }
+
+        .leaflet-control-zoom a {
+          background-color: #1a1a1a !important;
+          color: #00FF94 !important;
+          border: 1px solid #2a2a2a !important;
+        }
+
+        .leaflet-control-zoom a:hover {
+          background-color: #2a2a2a !important;
+          color: #00FF94 !important;
+        }
+
+        .leaflet-control-attribution {
+          background-color: rgba(26, 26, 26, 0.8) !important;
+          color: #888 !important;
+        }
+
+        .leaflet-control-attribution a {
+          color: #00FF94 !important;
+        }
+      `}</style>
     </div>
   )
 }
