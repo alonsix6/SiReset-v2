@@ -368,19 +368,20 @@ export default function Mapito({ user }) {
 
       // Ajustar vista según el contexto
       const bounds = geoJsonLayer.getBounds()
-      let padding, fitBoundsOptions
 
       if (includeContext) {
         // Con contexto: mostrar todo el mapa de Perú
-        padding = [100, 100]
-        fitBoundsOptions = { padding: padding }
+        tempMap.fitBounds(bounds, { padding: [100, 100] })
       } else {
-        // Sin contexto: ajustar solo a selección con padding generoso
-        padding = showBasemap ? [150, 150] : [150, 150]  // Padding grande para evitar cortes
-        fitBoundsOptions = { padding: padding, maxZoom: 18 }
+        // Sin contexto: centrar la selección con márgenes uniformes
+        // Usar paddingTopLeft y paddingBottomRight para asegurar centramiento perfecto
+        const padding = showBasemap ? 200 : 200  // Padding generoso y uniforme
+        tempMap.fitBounds(bounds, {
+          paddingTopLeft: [padding, padding],
+          paddingBottomRight: [padding, padding],
+          maxZoom: 18
+        })
       }
-
-      tempMap.fitBounds(bounds, fitBoundsOptions)
 
       // Esperar a que se carguen los tiles si el basemap está activo
       if (showBasemap) {
@@ -436,8 +437,8 @@ export default function Mapito({ user }) {
           }
         }
 
-        // Agregar un margen generoso para evitar cortes
-        const margin = 100  // Margen grande para seguridad
+        // Agregar un margen muy generoso para evitar cortes
+        const margin = 150  // Margen extra grande para garantizar seguridad
         minX = Math.max(0, minX - margin)
         minY = Math.max(0, minY - margin)
         maxX = Math.min(sourceCanvas.width - 1, maxX + margin)
@@ -445,6 +446,17 @@ export default function Mapito({ user }) {
 
         const croppedWidth = maxX - minX + 1
         const croppedHeight = maxY - minY + 1
+
+        // Si el contenido está muy cerca de los bordes, no hacer crop
+        // para evitar cortes accidentales
+        const minSafeMargin = 50
+        if (minX < minSafeMargin || minY < minSafeMargin ||
+            maxX > sourceCanvas.width - minSafeMargin ||
+            maxY > sourceCanvas.height - minSafeMargin) {
+          // Contenido muy cerca de los bordes, retornar canvas original
+          console.log('Contenido cerca de bordes, no se hace crop por seguridad')
+          return sourceCanvas
+        }
 
         // Crear nuevo canvas con el tamaño recortado
         const croppedCanvas = document.createElement('canvas')
