@@ -7,8 +7,8 @@ WORKDIR /frontend
 # Copiar package files
 COPY frontend/package*.json ./
 
-# Instalar dependencias
-RUN npm ci --only=production
+# Instalar dependencias (incluye devDependencies necesarias para build como Vite)
+RUN npm ci
 
 # Copiar código fuente del frontend
 COPY frontend/ ./
