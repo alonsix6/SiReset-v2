@@ -13,9 +13,11 @@ RUN npm ci
 # Copiar código fuente del frontend
 COPY frontend/ ./
 
-# Variables de entorno para build (se sobrescriben en Cloud Run)
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
+# Variables de entorno para build
+# Cloud Run: configurar estos valores en "Build environment variables"
+ARG VITE_SUPABASE_URL=https://jmzlfdbooafivioaapti.supabase.co
+ARG VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptemxmZGJvb2FmaXZpb2FhcHRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzNzUyOTIsImV4cCI6MjA3Nzk1MTI5Mn0.54NCHCK4h5MukcsVAgqAPBHrAAurypaR89G2EtZcfos
+
 ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
 ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 
