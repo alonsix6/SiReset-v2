@@ -40,12 +40,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar requirements del backend e instalar
-COPY backend/requirements.txt ./backend/
+COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r backend/requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
-# Copiar código del backend
-COPY backend/app ./backend/app
+# Copiar código del backend (estructura correcta para imports)
+COPY backend/app ./app
 
 # Copiar datos necesarios (GADM para Mapito)
 COPY data ./data
@@ -64,5 +64,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
 
-# Comando de inicio
-CMD exec uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT} --workers 1
+# Comando de inicio (app.main:app porque copiamos backend/app a /app/app)
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1
