@@ -3,16 +3,16 @@ export default function Mapito({ user }) {
     <div className="section-reset">
       <div className="container-reset max-w-4xl">
         {/* Header */}
-        <div className="mb-12 animate-fade-in-up">
-          <div className="inline-block mb-4">
-            <span className="text-reset-neon text-sm font-bold uppercase tracking-wider">
+        <div className="mb-8 lg:mb-12 animate-fade-in-up">
+          <div className="inline-block mb-3">
+            <span className="text-reset-neon text-xs sm:text-sm font-bold uppercase tracking-wider">
               // MÓDULO DE MAPAS
             </span>
           </div>
-          <h1 className="font-display text-5xl lg:text-6xl text-reset-white mb-4 leading-tight">
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl xl:text-6xl text-reset-white mb-3 lg:mb-4 leading-tight">
             <span className="text-gradient-neon">MAPITO</span>
           </h1>
-          <p className="text-reset-gray-light text-lg">
+          <p className="text-reset-gray-light text-base lg:text-lg">
             Mapas interactivos de Perú
           </p>
         </div>

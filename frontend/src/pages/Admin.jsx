@@ -115,16 +115,16 @@ export default function Admin({ user }) {
     <div className="section-reset">
       <div className="container-reset">
         {/* Header */}
-        <div className="mb-12 animate-fade-in-up">
-          <div className="inline-block mb-4">
-            <span className="text-reset-magenta text-sm font-bold uppercase tracking-wider">
+        <div className="mb-8 lg:mb-12 animate-fade-in-up">
+          <div className="inline-block mb-3">
+            <span className="text-reset-magenta text-xs sm:text-sm font-bold uppercase tracking-wider">
               // PANEL DE CONTROL
             </span>
           </div>
-          <h1 className="font-display text-5xl lg:text-6xl text-reset-white mb-4 leading-tight">
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl xl:text-6xl text-reset-white mb-3 lg:mb-4 leading-tight">
             ADMINISTRACIÓN
           </h1>
-          <p className="text-reset-gray-light text-lg">
+          <p className="text-reset-gray-light text-base lg:text-lg">
             Gestión de usuarios y permisos del sistema
           </p>
         </div>
@@ -190,8 +190,8 @@ export default function Admin({ user }) {
 
         {/* Tabla de usuarios */}
         <div className="card-reset-shadow mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
-          <div className="mb-6">
-            <h2 className="font-display text-3xl text-reset-white uppercase">
+          <div className="mb-4 lg:mb-6">
+            <h2 className="font-display text-2xl lg:text-3xl text-reset-white uppercase">
               Usuarios <span className="text-reset-neon">Registrados</span>
             </h2>
           </div>
@@ -294,11 +294,11 @@ function UserRow({ user, onUpdateRole, onUpdateModules }) {
   return (
     <tr>
       <td>
-        <div>
-          <div className="font-semibold text-reset-white mb-1">
+        <div className="max-w-[250px]">
+          <div className="font-semibold text-reset-white mb-1 truncate">
             {user.user_metadata?.name || user.email}
           </div>
-          <div className="text-sm text-reset-gray-light">{user.email}</div>
+          <div className="text-sm text-reset-gray-light break-all">{user.email}</div>
         </div>
       </td>
       <td>

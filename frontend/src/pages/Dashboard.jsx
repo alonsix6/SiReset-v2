@@ -30,18 +30,18 @@ export default function Dashboard({ user }) {
     <div className="section-reset">
       <div className="container-reset">
         {/* Hero Section */}
-        <div className="mb-16 animate-fade-in-up">
-          <div className="inline-block mb-4">
-            <span className="text-reset-neon text-sm font-bold uppercase tracking-wider">
+        <div className="mb-12 lg:mb-16 animate-fade-in-up">
+          <div className="inline-block mb-3">
+            <span className="text-reset-neon text-xs sm:text-sm font-bold uppercase tracking-wider">
               // DASHBOARD
             </span>
           </div>
-          <h1 className="font-display text-5xl lg:text-7xl text-reset-white mb-4 leading-tight">
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl xl:text-6xl text-reset-white mb-3 lg:mb-4 leading-tight">
             BIENVENIDO,
             <br />
-            <span className="text-gradient-neon">{user.name.toUpperCase()}</span>
+            <span className="text-gradient-neon break-words">{user.name.toUpperCase()}</span>
           </h1>
-          <p className="text-reset-gray-light text-lg max-w-2xl">
+          <p className="text-reset-gray-light text-base lg:text-lg max-w-2xl">
             Selecciona una herramienta para comenzar a trabajar con tus datos
           </p>
         </div>
@@ -101,7 +101,7 @@ export default function Dashboard({ user }) {
 
         {/* User Stats */}
         <div>
-          <h2 className="font-display text-3xl text-reset-white mb-8 uppercase">
+          <h2 className="font-display text-2xl lg:text-3xl text-reset-white mb-6 lg:mb-8 uppercase">
             Información del <span className="text-reset-neon">Usuario</span>
           </h2>
 
@@ -116,7 +116,7 @@ export default function Dashboard({ user }) {
                   <span className="text-reset-blue text-xs">@</span>
                 </div>
               </div>
-              <div className="text-reset-white text-xl font-semibold break-all">
+              <div className="text-reset-white text-base lg:text-xl font-semibold break-all">
                 {user.email}
               </div>
             </div>

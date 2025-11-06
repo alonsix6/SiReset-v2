@@ -62,8 +62,8 @@ export default function Layout({ user, onLogout, children }) {
 
             {/* User Info & Logout */}
             <div className="flex items-center space-x-4">
-              <div className="hidden lg:block text-right">
-                <div className="text-sm font-body font-semibold text-reset-white">
+              <div className="hidden lg:block text-right max-w-[200px]">
+                <div className="text-sm font-body font-semibold text-reset-white truncate">
                   {user.name}
                 </div>
                 <div className="text-xs text-reset-gray-light uppercase tracking-wider">
