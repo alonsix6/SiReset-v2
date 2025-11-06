@@ -37,6 +37,7 @@ export default function Mapito({ user }) {
   const [grosorBorde, setGrosorBorde] = useState(0.8)
   const [showBorders, setShowBorders] = useState(true)
   const [showBasemap, setShowBasemap] = useState(true)
+  const [includeContext, setIncludeContext] = useState(false)  // Incluir mapa completo para contexto
 
   // Refs
   const mapRef = useRef(null)
@@ -338,23 +339,48 @@ export default function Mapito({ user }) {
         }).addTo(tempMap)
       }
 
-      // Agregar SOLO los features seleccionados
-      const geoJsonLayer = L.geoJSON(selectedData, {
-        style: {
-          fillColor: colorSelected,
-          fillOpacity: 0.95,
-          color: showBorders ? colorBorder : colorSelected,
-          weight: showBorders ? grosorBorde : 0
-        }
-      }).addTo(tempMap)
+      // Decidir qué features agregar según includeContext
+      let geoJsonLayer
+      if (includeContext) {
+        // Agregar TODO el mapa con estilos diferenciados
+        geoJsonLayer = L.geoJSON(geoData, {
+          style: (feature) => {
+            const selected = isSelected(feature)
+            return {
+              fillColor: selected ? colorSelected : colorGeneral,
+              fillOpacity: selected ? 0.95 : 0.85,
+              color: showBorders ? colorBorder : (selected ? colorSelected : colorGeneral),
+              weight: showBorders ? grosorBorde : 0
+            }
+          }
+        }).addTo(tempMap)
+      } else {
+        // Agregar SOLO los features seleccionados
+        geoJsonLayer = L.geoJSON(selectedData, {
+          style: {
+            fillColor: colorSelected,
+            fillOpacity: 0.95,
+            color: showBorders ? colorBorder : colorSelected,
+            weight: showBorders ? grosorBorde : 0
+          }
+        }).addTo(tempMap)
+      }
 
-      // Ajustar vista a las áreas seleccionadas con padding mínimo para maximizar área
+      // Ajustar vista según el contexto
       const bounds = geoJsonLayer.getBounds()
-      const padding = showBasemap ? [100, 100] : [20, 20]  // Mínimo padding sin basemap
-      tempMap.fitBounds(bounds, {
-        padding: padding,
-        maxZoom: 18  // Evitar zoom excesivo
-      })
+      let padding, fitBoundsOptions
+
+      if (includeContext) {
+        // Con contexto: mostrar todo el mapa de Perú
+        padding = [100, 100]
+        fitBoundsOptions = { padding: padding }
+      } else {
+        // Sin contexto: ajustar solo a selección
+        padding = showBasemap ? [100, 100] : [20, 20]
+        fitBoundsOptions = { padding: padding, maxZoom: 18 }
+      }
+
+      tempMap.fitBounds(bounds, fitBoundsOptions)
 
       // Esperar a que se carguen los tiles si el basemap está activo
       if (showBasemap) {
@@ -431,7 +457,8 @@ export default function Mapito({ user }) {
       }
 
       // Recortar el canvas para eliminar espacios vacíos
-      const finalCanvas = showBasemap ? canvas : cropCanvas(canvas)
+      // No recortar si incluye contexto o basemap
+      const finalCanvas = (showBasemap || includeContext) ? canvas : cropCanvas(canvas)
 
       // Convertir a PNG y descargar
       finalCanvas.toBlob((blob) => {
@@ -470,6 +497,7 @@ export default function Mapito({ user }) {
     setGrosorBorde(0.8)
     setShowBorders(true)
     setShowBasemap(true)
+    setIncludeContext(false)
   }
 
   return (
@@ -820,6 +848,19 @@ export default function Mapito({ user }) {
                   </label>
                 </div>
 
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="includeContext"
+                    checked={includeContext}
+                    onChange={(e) => setIncludeContext(e.target.checked)}
+                    className="form-checkbox text-reset-neon"
+                  />
+                  <label htmlFor="includeContext" className="text-reset-gray-light text-sm cursor-pointer">
+                    Incluir Mapa Completo
+                  </label>
+                </div>
+
                 <button
                   onClick={resetColors}
                   className="w-full px-3 py-2 bg-reset-gray-dark border border-reset-gray-medium text-reset-gray-light rounded-reset hover:border-reset-purple hover:text-reset-purple transition-colors text-sm"
@@ -840,7 +881,7 @@ export default function Mapito({ user }) {
               </button>
               <div className="mt-2 space-y-1">
                 <p className="text-reset-gray-light text-xs text-center">
-                  Solo exportará las áreas seleccionadas
+                  {includeContext ? '🗺️ Exportará el mapa completo' : 'Solo exportará las áreas seleccionadas'}
                 </p>
                 <p className="text-reset-cyan text-xs text-center">
                   {showBasemap ? '📍 Con mapa base' : '✨ Fondo transparente'}
