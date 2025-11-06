@@ -20,8 +20,7 @@
     "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/auth-ui-shared": "^0.1.8",
     "leaflet": "^1.9.4",
-    "react-leaflet": "^4.2.1",
-    "html-to-image": "^1.11.11"
+    "react-leaflet": "^4.2.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
