@@ -375,8 +375,8 @@ export default function Mapito({ user }) {
         padding = [100, 100]
         fitBoundsOptions = { padding: padding }
       } else {
-        // Sin contexto: ajustar solo a selección
-        padding = showBasemap ? [100, 100] : [20, 20]
+        // Sin contexto: ajustar solo a selección con padding generoso
+        padding = showBasemap ? [150, 150] : [150, 150]  // Padding grande para evitar cortes
         fitBoundsOptions = { padding: padding, maxZoom: 18 }
       }
 
@@ -415,13 +415,19 @@ export default function Mapito({ user }) {
         let maxY = 0
 
         // Encontrar los límites del contenido no transparente
+        // Usar umbral bajo para detectar incluso píxeles semi-transparentes
         for (let y = 0; y < sourceCanvas.height; y++) {
           for (let x = 0; x < sourceCanvas.width; x++) {
             const index = (y * sourceCanvas.width + x) * 4
             const alpha = pixels[index + 3]
+            const red = pixels[index]
+            const green = pixels[index + 1]
+            const blue = pixels[index + 2]
 
-            // Si el píxel no es completamente transparente
-            if (alpha > 0 || showBasemap) {
+            // Detectar cualquier píxel con contenido (alpha > 10 o tiene color)
+            const hasContent = alpha > 10 || (red > 0 || green > 0 || blue > 0)
+
+            if (hasContent || showBasemap) {
               if (x < minX) minX = x
               if (x > maxX) maxX = x
               if (y < minY) minY = y
@@ -430,8 +436,8 @@ export default function Mapito({ user }) {
           }
         }
 
-        // Agregar un pequeño margen
-        const margin = 20
+        // Agregar un margen generoso para evitar cortes
+        const margin = 100  // Margen grande para seguridad
         minX = Math.max(0, minX - margin)
         minY = Math.max(0, minY - margin)
         maxX = Math.min(sourceCanvas.width - 1, maxX + margin)
