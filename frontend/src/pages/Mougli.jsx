@@ -75,16 +75,16 @@ export default function Mougli({ user }) {
     <div className="section-reset">
       <div className="container-reset max-w-5xl">
         {/* Header */}
-        <div className="mb-12 animate-fade-in-up">
-          <div className="inline-block mb-4">
-            <span className="text-reset-cyan text-sm font-bold uppercase tracking-wider">
+        <div className="mb-8 lg:mb-12 animate-fade-in-up">
+          <div className="inline-block mb-3">
+            <span className="text-reset-cyan text-xs sm:text-sm font-bold uppercase tracking-wider">
               // MÓDULO DE PROCESAMIENTO
             </span>
           </div>
-          <h1 className="font-display text-5xl lg:text-6xl text-reset-white mb-4 leading-tight">
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl xl:text-6xl text-reset-white mb-3 lg:mb-4 leading-tight">
             <span className="text-gradient-neon">MOUGLI</span>
           </h1>
-          <p className="text-reset-gray-light text-lg">
+          <p className="text-reset-gray-light text-base lg:text-lg">
             Procesamiento de archivos Monitor & OutView
           </p>
         </div>

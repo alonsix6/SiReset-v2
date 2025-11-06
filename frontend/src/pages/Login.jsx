@@ -112,10 +112,10 @@ export default function Login({ onLogin }) {
         <div className="bg-reset-gray-dark border border-reset-gray-medium rounded-reset p-8 lg:p-10 shadow-reset-lg">
           {/* Logo & Title */}
           <div className="text-center mb-8">
-            <h1 className="font-display text-4xl lg:text-5xl text-reset-white mb-2 tracking-tight">
+            <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl text-reset-white mb-2 tracking-tight">
               SI<span className="text-reset-neon">RESET</span>
             </h1>
-            <p className="text-reset-gray-light text-sm uppercase tracking-wider">
+            <p className="text-reset-gray-light text-xs sm:text-sm uppercase tracking-wider">
               Suite de Herramientas para Reset
             </p>
           </div>
