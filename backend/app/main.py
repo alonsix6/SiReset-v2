@@ -52,7 +52,11 @@ app.include_router(mougli.router, prefix="/api/mougli", tags=["mougli"])
 app.include_router(mapito.router, prefix="/api/mapito", tags=["mapito"])
 
 # Servir archivos estáticos del frontend (para producción en Cloud Run)
-static_dir = Path(__file__).parent.parent.parent / "frontend" / "dist"
+# Si __file__ = /app/app/main.py, entonces parent.parent = /app
+static_dir = Path(__file__).parent.parent / "frontend" / "dist"
+print(f"Looking for frontend in: {static_dir}")
+print(f"Frontend exists: {static_dir.exists()}")
+
 if static_dir.exists():
     # Montar archivos estáticos
     app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
@@ -76,6 +80,7 @@ if static_dir.exists():
 
         return JSONResponse({"error": "Frontend not built"}, status_code=404)
 else:
+    print(f"WARNING: Frontend directory not found at {static_dir}")
     # Fallback si no hay frontend construido
     @app.get("/")
     async def root():
