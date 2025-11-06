@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
-import { toPng } from 'html-to-image'
+import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 // Componente para ajustar el zoom del mapa
@@ -9,7 +9,7 @@ function FitBounds({ bounds }) {
 
   useEffect(() => {
     if (bounds && bounds.length > 0) {
-      map.fitBounds(bounds)
+      map.fitBounds(bounds, { padding: [50, 50] })
     }
   }, [bounds, map])
 
@@ -24,9 +24,11 @@ export default function Mapito({ user }) {
   const [availableRegions, setAvailableRegions] = useState([])
   const [availableProvinces, setAvailableProvinces] = useState([])
   const [selectedProvinces, setSelectedProvinces] = useState([])
+  const [availableDistricts, setAvailableDistricts] = useState([])
   const [selectedDistricts, setSelectedDistricts] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   // Estado de colores y estilos
   const [colorGeneral, setColorGeneral] = useState('#713030')
@@ -38,7 +40,6 @@ export default function Mapito({ user }) {
 
   // Refs
   const mapRef = useRef(null)
-  const mapContainerRef = useRef(null)
 
   // Bounds para fitBounds
   const [mapBounds, setMapBounds] = useState(null)
@@ -46,7 +47,7 @@ export default function Mapito({ user }) {
   // Cargar datos GeoJSON según el nivel
   useEffect(() => {
     loadGeoData()
-  }, [nivel])
+  }, [nivel, selectedProvinces])
 
   // Cargar lista de regiones disponibles
   useEffect(() => {
@@ -61,7 +62,7 @@ export default function Mapito({ user }) {
 
   // Cargar provincias cuando se selecciona una región
   useEffect(() => {
-    if (selectedRegions.length > 0 && nivel === 'provincias') {
+    if (selectedRegions.length > 0 && (nivel === 'provincias' || nivel === 'distritos')) {
       fetch('/data/gadm41_PER_2.json')
         .then(res => res.json())
         .then(data => {
@@ -80,12 +81,38 @@ export default function Mapito({ user }) {
     }
   }, [selectedRegions, nivel])
 
+  // Cargar distritos cuando se seleccionan provincias
+  useEffect(() => {
+    if (selectedProvinces.length > 0 && nivel === 'distritos') {
+      fetch('/data/gadm41_PER_3.json')
+        .then(res => res.json())
+        .then(data => {
+          const districts = data.features
+            .filter(f => selectedProvinces.some(p =>
+              p.region === f.properties.NAME_1 && p.name === f.properties.NAME_2
+            ))
+            .map(f => ({
+              name: f.properties.NAME_3,
+              province: f.properties.NAME_2,
+              region: f.properties.NAME_1
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+          setAvailableDistricts(districts)
+        })
+        .catch(err => console.error('Error cargando distritos:', err))
+    } else {
+      setAvailableDistricts([])
+    }
+  }, [selectedProvinces, nivel])
+
   const loadGeoData = async () => {
     setLoading(true)
     setError(null)
 
     try {
       let filename
+      let data
+
       switch (nivel) {
         case 'regiones':
           filename = 'gadm41_PER_1.json'
@@ -94,6 +121,12 @@ export default function Mapito({ user }) {
           filename = 'gadm41_PER_2.json'
           break
         case 'distritos':
+          // Solo cargar distritos de las provincias seleccionadas
+          if (selectedProvinces.length === 0) {
+            setGeoData(null)
+            setLoading(false)
+            return
+          }
           filename = 'gadm41_PER_3.json'
           break
         default:
@@ -103,41 +136,55 @@ export default function Mapito({ user }) {
       const response = await fetch(`/data/${filename}`)
       if (!response.ok) throw new Error('Error cargando datos del mapa')
 
-      const data = await response.json()
+      data = await response.json()
+
+      // Filtrar distritos solo de las provincias seleccionadas
+      if (nivel === 'distritos' && selectedProvinces.length > 0) {
+        data.features = data.features.filter(f =>
+          selectedProvinces.some(p =>
+            p.region === f.properties.NAME_1 && p.name === f.properties.NAME_2
+          )
+        )
+      }
+
       setGeoData(data)
 
-      // Calcular bounds
-      if (data.features.length > 0) {
-        const allCoords = []
-        data.features.forEach(feature => {
-          if (feature.geometry.type === 'Polygon') {
-            feature.geometry.coordinates[0].forEach(coord => {
-              allCoords.push([coord[1], coord[0]]) // Leaflet usa [lat, lng]
-            })
-          } else if (feature.geometry.type === 'MultiPolygon') {
-            feature.geometry.coordinates.forEach(polygon => {
-              polygon[0].forEach(coord => {
-                allCoords.push([coord[1], coord[0]])
-              })
-            })
-          }
-        })
-
-        if (allCoords.length > 0) {
-          const lats = allCoords.map(c => c[0])
-          const lngs = allCoords.map(c => c[1])
-          setMapBounds([
-            [Math.min(...lats), Math.min(...lngs)],
-            [Math.max(...lats), Math.max(...lngs)]
-          ])
-        }
-      }
+      // Calcular bounds solo de las áreas seleccionadas o todas
+      calculateBounds(data)
 
     } catch (err) {
       setError(err.message)
       console.error('Error:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const calculateBounds = (data) => {
+    if (!data || data.features.length === 0) return
+
+    const allCoords = []
+    data.features.forEach(feature => {
+      if (feature.geometry.type === 'Polygon') {
+        feature.geometry.coordinates[0].forEach(coord => {
+          allCoords.push([coord[1], coord[0]]) // Leaflet usa [lat, lng]
+        })
+      } else if (feature.geometry.type === 'MultiPolygon') {
+        feature.geometry.coordinates.forEach(polygon => {
+          polygon[0].forEach(coord => {
+            allCoords.push([coord[1], coord[0]])
+          })
+        })
+      }
+    })
+
+    if (allCoords.length > 0) {
+      const lats = allCoords.map(c => c[0])
+      const lngs = allCoords.map(c => c[1])
+      setMapBounds([
+        [Math.min(...lats), Math.min(...lngs)],
+        [Math.max(...lats), Math.max(...lngs)]
+      ])
     }
   }
 
@@ -239,24 +286,99 @@ export default function Mapito({ user }) {
     })
   }
 
-  // Exportar a PNG
+  // Exportar a PNG - Solo el mapa con áreas seleccionadas
   const exportToPng = async () => {
-    if (!mapContainerRef.current) return
+    if (!mapRef.current || !geoData) return
+
+    setExporting(true)
 
     try {
-      const dataUrl = await toPng(mapContainerRef.current, {
-        quality: 1.0,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff'
+      const map = mapRef.current
+
+      // Obtener features seleccionados
+      const selectedFeatures = geoData.features.filter(f => isSelected(f))
+
+      if (selectedFeatures.length === 0) {
+        alert('Por favor selecciona al menos un área para exportar')
+        setExporting(false)
+        return
+      }
+
+      // Calcular bounds de las áreas seleccionadas
+      const selectedData = {
+        type: 'FeatureCollection',
+        features: selectedFeatures
+      }
+
+      // Crear un mapa temporal para exportar
+      const tempDiv = document.createElement('div')
+      tempDiv.style.width = '1200px'
+      tempDiv.style.height = '800px'
+      tempDiv.style.position = 'absolute'
+      tempDiv.style.left = '-9999px'
+      document.body.appendChild(tempDiv)
+
+      // Crear mapa temporal
+      const tempMap = L.map(tempDiv, {
+        zoomControl: false,
+        attributionControl: false
+      }).setView([-9.2, -75.0], 5)
+
+      if (showBasemap) {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(tempMap)
+      }
+
+      // Agregar solo los features seleccionados
+      const geoJsonLayer = L.geoJSON(selectedData, {
+        style: (feature) => ({
+          fillColor: colorSelected,
+          fillOpacity: 0.95,
+          color: showBorders ? colorBorder : colorSelected,
+          weight: showBorders ? grosorBorde : 0,
+        })
+      }).addTo(tempMap)
+
+      // Ajustar el mapa a los bounds de lo seleccionado
+      tempMap.fitBounds(geoJsonLayer.getBounds(), { padding: [50, 50] })
+
+      // Esperar a que se carguen los tiles
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // Usar leaflet-image o similar para capturar
+      // Como no tenemos leaflet-image, vamos a usar html2canvas o tomar screenshot del canvas
+
+      // Intentar obtener el canvas del mapa
+      const mapPane = tempDiv.querySelector('.leaflet-map-pane')
+
+      // Importar html2canvas dinámicamente
+      const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
+
+      const canvas = await html2canvas(tempDiv, {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: showBasemap ? '#ffffff' : '#1a1a1a',
+        scale: 2
       })
 
-      const link = document.createElement('a')
-      link.download = `mapa-peru-${nivel}-${Date.now()}.png`
-      link.href = dataUrl
-      link.click()
+      // Convertir a PNG y descargar
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.download = `mapa-peru-${nivel}-${Date.now()}.png`
+        link.href = url
+        link.click()
+        URL.revokeObjectURL(url)
+
+        // Limpiar
+        tempMap.remove()
+        document.body.removeChild(tempDiv)
+        setExporting(false)
+      }, 'image/png')
+
     } catch (err) {
       console.error('Error exportando mapa:', err)
       alert('Error al exportar el mapa. Por favor, intenta nuevamente.')
+      setExporting(false)
     }
   }
 
@@ -408,6 +530,112 @@ export default function Mapito({ user }) {
                 </div>
               )}
 
+              {nivel === 'distritos' && (
+                <div className="space-y-3">
+                  <div className="bg-reset-gray-dark border border-reset-cyan rounded p-2 mb-3">
+                    <p className="text-reset-cyan text-xs">
+                      💡 Primero selecciona regiones, luego provincias y finalmente los distritos
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-reset-gray-light text-sm mb-2 block">
+                      1. Regiones base
+                    </label>
+                    <select
+                      multiple
+                      value={selectedRegions}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value)
+                        setSelectedRegions(selected)
+                        setSelectedProvinces([])
+                        setSelectedDistricts([])
+                      }}
+                      className="w-full bg-reset-gray-dark border border-reset-gray-medium rounded-reset px-3 py-2 text-reset-white focus:outline-none focus:border-reset-neon text-sm"
+                      size="3"
+                    >
+                      {availableRegions.map(region => (
+                        <option key={region} value={region}>{region}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {availableProvinces.length > 0 && (
+                    <div>
+                      <label className="text-reset-gray-light text-sm mb-2 block">
+                        2. Provincias ({selectedProvinces.length})
+                      </label>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {availableProvinces.map(prov => (
+                          <label key={`${prov.region}-${prov.name}`} className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-reset-gray-dark p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedProvinces.some(p => p.region === prov.region && p.name === prov.name)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedProvinces([...selectedProvinces, prov])
+                                } else {
+                                  setSelectedProvinces(selectedProvinces.filter(p =>
+                                    !(p.region === prov.region && p.name === prov.name)
+                                  ))
+                                  // Limpiar distritos de esta provincia
+                                  setSelectedDistricts(selectedDistricts.filter(d =>
+                                    !(d.region === prov.region && d.province === prov.name)
+                                  ))
+                                }
+                              }}
+                              className="form-checkbox text-reset-neon"
+                            />
+                            <span className="text-reset-gray-light text-xs">{prov.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {availableDistricts.length > 0 && (
+                    <div>
+                      <label className="text-reset-gray-light text-sm mb-2 block">
+                        3. Distritos ({selectedDistricts.length})
+                      </label>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {availableDistricts.map(dist => (
+                          <label key={`${dist.region}-${dist.province}-${dist.name}`} className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-reset-gray-dark p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedDistricts.some(d =>
+                                d.region === dist.region &&
+                                d.province === dist.province &&
+                                d.name === dist.name
+                              )}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedDistricts([...selectedDistricts, dist])
+                                } else {
+                                  setSelectedDistricts(selectedDistricts.filter(d =>
+                                    !(d.region === dist.region &&
+                                      d.province === dist.province &&
+                                      d.name === dist.name)
+                                  ))
+                                }
+                              }}
+                              className="form-checkbox text-reset-neon"
+                            />
+                            <span className="text-reset-gray-light text-xs">{dist.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedProvinces.length === 0 && selectedRegions.length > 0 && (
+                    <p className="text-reset-yellow text-xs mt-2">
+                      ⚠️ Selecciona al menos una provincia para ver los distritos
+                    </p>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={clearSelections}
                 className="mt-3 w-full px-3 py-2 bg-reset-gray-dark border border-reset-gray-medium text-reset-gray-light rounded-reset hover:border-reset-red hover:text-reset-red transition-colors text-sm"
@@ -532,17 +760,20 @@ export default function Mapito({ user }) {
             <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
               <button
                 onClick={exportToPng}
-                disabled={loading || !geoData}
+                disabled={loading || !geoData || exporting}
                 className="w-full px-4 py-3 bg-gradient-to-r from-reset-neon to-green-400 text-reset-black font-bold rounded-reset hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                📥 Descargar PNG
+                {exporting ? '⏳ Exportando...' : '📥 Descargar PNG'}
               </button>
+              <p className="text-reset-gray-light text-xs mt-2 text-center">
+                Solo exportará las áreas seleccionadas
+              </p>
             </div>
 
             {/* Info */}
             <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
               <div className="text-reset-gray-light text-xs space-y-2">
-                <p><strong className="text-reset-neon">Tip:</strong> Haz clic en el mapa para seleccionar regiones</p>
+                <p><strong className="text-reset-neon">Tip:</strong> Haz clic en el mapa para seleccionar</p>
                 <p><strong className="text-reset-cyan">Zoom:</strong> Scroll del mouse o botones +/-</p>
                 <p><strong className="text-reset-purple">Pan:</strong> Arrastra el mapa</p>
               </div>
@@ -552,7 +783,7 @@ export default function Mapito({ user }) {
           {/* Mapa */}
           <div className="lg:col-span-3">
             <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-              <div ref={mapContainerRef} className="w-full" style={{ height: '700px' }}>
+              <div className="w-full" style={{ height: '700px' }}>
                 {loading && (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-reset-neon text-lg">Cargando mapa...</div>
@@ -565,7 +796,18 @@ export default function Mapito({ user }) {
                   </div>
                 )}
 
-                {!loading && !error && geoData && (
+                {nivel === 'distritos' && selectedProvinces.length === 0 && !loading && (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="text-4xl mb-4">🗺️</div>
+                      <div className="text-reset-gray-light">
+                        Selecciona regiones y provincias para ver los distritos
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!loading && !error && geoData && (nivel !== 'distritos' || selectedProvinces.length > 0) && (
                   <MapContainer
                     ref={mapRef}
                     center={[-9.2, -75.0]}
@@ -581,7 +823,7 @@ export default function Mapito({ user }) {
                     )}
 
                     <GeoJSON
-                      key={`${nivel}-${selectedRegions.join(',')}-${selectedProvinces.map(p => p.name).join(',')}-${colorGeneral}-${colorSelected}-${colorBorder}-${grosorBorde}-${showBorders}`}
+                      key={`${nivel}-${selectedRegions.join(',')}-${selectedProvinces.map(p => p.name).join(',')}-${selectedDistricts.map(d => d.name).join(',')}-${colorGeneral}-${colorSelected}-${colorBorder}-${grosorBorde}-${showBorders}`}
                       data={geoData}
                       style={getFeatureStyle}
                       onEachFeature={onEachFeature}
