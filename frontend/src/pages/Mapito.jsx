@@ -308,17 +308,17 @@ export default function Mapito({ user }) {
         features: selectedFeatures
       }
 
-      // Crear un contenedor temporal
+      // Crear un contenedor temporal más grande para evitar cortes
       const tempDiv = document.createElement('div')
-      tempDiv.style.width = '1200px'
-      tempDiv.style.height = '800px'
+      tempDiv.style.width = '2400px'
+      tempDiv.style.height = '2400px'
       tempDiv.style.position = 'absolute'
       tempDiv.style.left = '-9999px'
       tempDiv.style.top = '0'
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
       document.body.appendChild(tempDiv)
 
-      // Crear mapa temporal - importante: sin tiles para que solo se vean las áreas
+      // Crear mapa temporal
       const tempMap = L.map(tempDiv, {
         zoomControl: false,
         attributionControl: false,
@@ -332,14 +332,13 @@ export default function Mapito({ user }) {
       }
 
       // Si showBasemap está activo, agregar el mapa base
-      let tileLayer = null
       if (showBasemap) {
-        tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19
         }).addTo(tempMap)
       }
 
-      // Agregar SOLO los features seleccionados con el color seleccionado
+      // Agregar SOLO los features seleccionados
       const geoJsonLayer = L.geoJSON(selectedData, {
         style: {
           fillColor: colorSelected,
@@ -349,33 +348,93 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      // Ajustar vista a las áreas seleccionadas
+      // Ajustar vista a las áreas seleccionadas con padding mínimo para maximizar área
       const bounds = geoJsonLayer.getBounds()
-      tempMap.fitBounds(bounds, { padding: [50, 50] })
+      const padding = showBasemap ? [100, 100] : [20, 20]  // Mínimo padding sin basemap
+      tempMap.fitBounds(bounds, {
+        padding: padding,
+        maxZoom: 18  // Evitar zoom excesivo
+      })
 
       // Esperar a que se carguen los tiles si el basemap está activo
       if (showBasemap) {
         await new Promise(resolve => setTimeout(resolve, 1500))
       } else {
-        await new Promise(resolve => setTimeout(resolve, 300))
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
 
       // Importar html2canvas dinámicamente
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
 
-      // Capturar el mapa
+      // Capturar el mapa completo
       const canvas = await html2canvas(tempDiv, {
         useCORS: true,
         allowTaint: true,
         backgroundColor: showBasemap ? '#ffffff' : null,
-        scale: 2,
+        scale: 1,  // Escala 1 porque el div ya es grande
         logging: false,
-        width: 1200,
-        height: 800
+        width: 2400,
+        height: 2400
       })
 
+      // Función para recortar el canvas eliminando áreas transparentes
+      const cropCanvas = (sourceCanvas) => {
+        const ctx = sourceCanvas.getContext('2d')
+        const imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
+        const pixels = imageData.data
+
+        let minX = sourceCanvas.width
+        let minY = sourceCanvas.height
+        let maxX = 0
+        let maxY = 0
+
+        // Encontrar los límites del contenido no transparente
+        for (let y = 0; y < sourceCanvas.height; y++) {
+          for (let x = 0; x < sourceCanvas.width; x++) {
+            const index = (y * sourceCanvas.width + x) * 4
+            const alpha = pixels[index + 3]
+
+            // Si el píxel no es completamente transparente
+            if (alpha > 0 || showBasemap) {
+              if (x < minX) minX = x
+              if (x > maxX) maxX = x
+              if (y < minY) minY = y
+              if (y > maxY) maxY = y
+            }
+          }
+        }
+
+        // Agregar un pequeño margen
+        const margin = 20
+        minX = Math.max(0, minX - margin)
+        minY = Math.max(0, minY - margin)
+        maxX = Math.min(sourceCanvas.width - 1, maxX + margin)
+        maxY = Math.min(sourceCanvas.height - 1, maxY + margin)
+
+        const croppedWidth = maxX - minX + 1
+        const croppedHeight = maxY - minY + 1
+
+        // Crear nuevo canvas con el tamaño recortado
+        const croppedCanvas = document.createElement('canvas')
+        croppedCanvas.width = croppedWidth
+        croppedCanvas.height = croppedHeight
+        const croppedCtx = croppedCanvas.getContext('2d')
+
+        // Copiar la región recortada
+        croppedCtx.drawImage(
+          sourceCanvas,
+          minX, minY, croppedWidth, croppedHeight,
+          0, 0, croppedWidth, croppedHeight
+        )
+
+        return croppedCanvas
+      }
+
+      // Recortar el canvas para eliminar espacios vacíos
+      const finalCanvas = showBasemap ? canvas : cropCanvas(canvas)
+
       // Convertir a PNG y descargar
-      canvas.toBlob((blob) => {
+      finalCanvas.toBlob((blob) => {
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.download = `mapa-peru-${nivel}-${Date.now()}.png`
