@@ -316,14 +316,17 @@ export default function Mapito({ user }) {
       tempDiv.style.height = '800px'
       tempDiv.style.position = 'absolute'
       tempDiv.style.left = '-9999px'
+      tempDiv.style.backgroundColor = 'transparent'
       document.body.appendChild(tempDiv)
 
-      // Crear mapa temporal
+      // Crear mapa temporal con fondo transparente
       const tempMap = L.map(tempDiv, {
         zoomControl: false,
-        attributionControl: false
+        attributionControl: false,
+        preferCanvas: true
       }).setView([-9.2, -75.0], 5)
 
+      // Solo agregar basemap si está activado
       if (showBasemap) {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(tempMap)
       }
@@ -356,7 +359,7 @@ export default function Mapito({ user }) {
       const canvas = await html2canvas(tempDiv, {
         useCORS: true,
         allowTaint: true,
-        backgroundColor: showBasemap ? '#ffffff' : '#1a1a1a',
+        backgroundColor: showBasemap ? '#ffffff' : null,  // null = transparente
         scale: 2
       })
 
@@ -765,9 +768,14 @@ export default function Mapito({ user }) {
               >
                 {exporting ? '⏳ Exportando...' : '📥 Descargar PNG'}
               </button>
-              <p className="text-reset-gray-light text-xs mt-2 text-center">
-                Solo exportará las áreas seleccionadas
-              </p>
+              <div className="mt-2 space-y-1">
+                <p className="text-reset-gray-light text-xs text-center">
+                  Solo exportará las áreas seleccionadas
+                </p>
+                <p className="text-reset-cyan text-xs text-center">
+                  {showBasemap ? '📍 Con mapa base' : '✨ Fondo transparente'}
+                </p>
+              </div>
             </div>
 
             {/* Info */}
