@@ -1,11 +1,13 @@
-import { useEffect } from 'react'
-import { Auth } from '@supabase/auth-ui-react'
-import { ThemeSupa } from '@supabase/auth-ui-shared'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useNavigate } from 'react-router-dom'
 
 export default function Login({ onLogin }) {
   const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     // Verificar sesión actual
@@ -63,6 +65,39 @@ export default function Login({ onLogin }) {
     }
   }
 
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      })
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          setError('Email o contraseña incorrectos')
+        } else if (error.message.includes('Email not confirmed')) {
+          setError('Por favor confirma tu email primero')
+        } else {
+          setError('Error al iniciar sesión. Contacta al administrador.')
+        }
+        setLoading(false)
+        return
+      }
+
+      if (data.session) {
+        await handleSession(data.session)
+      }
+    } catch (err) {
+      console.error('Error en login:', err)
+      setError('Error al iniciar sesión. Intenta de nuevo.')
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-500">
       <div className="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md">
@@ -71,69 +106,63 @@ export default function Login({ onLogin }) {
           <p className="text-gray-600">Suite de Herramientas para Reset</p>
         </div>
 
-        {/* Supabase Auth UI Component */}
-        <Auth
-          supabaseClient={supabase}
-          appearance={{
-            theme: ThemeSupa,
-            variables: {
-              default: {
-                colors: {
-                  brand: '#5f48c6',
-                  brandAccent: '#4c3ba6',
-                }
-              }
-            },
-            className: {
-              container: 'auth-container',
-              button: 'auth-button',
-              input: 'auth-input',
-            }
-          }}
-          providers={['google']}
-          localization={{
-            variables: {
-              sign_in: {
-                email_label: 'Email',
-                password_label: 'Contraseña',
-                email_input_placeholder: 'tu@email.com',
-                password_input_placeholder: '••••••••',
-                button_label: 'Iniciar Sesión',
-                loading_button_label: 'Iniciando sesión...',
-                social_provider_text: 'Iniciar sesión con {{provider}}',
-                link_text: '¿Ya tienes una cuenta? Inicia sesión',
-              },
-              sign_up: {
-                email_label: 'Email',
-                password_label: 'Contraseña',
-                email_input_placeholder: 'tu@email.com',
-                password_input_placeholder: '••••••••',
-                button_label: 'Registrarse',
-                loading_button_label: 'Registrando...',
-                social_provider_text: 'Registrarse con {{provider}}',
-                link_text: '¿No tienes cuenta? Regístrate',
-              },
-              forgotten_password: {
-                email_label: 'Email',
-                password_label: 'Contraseña',
-                email_input_placeholder: 'tu@email.com',
-                button_label: 'Enviar instrucciones',
-                loading_button_label: 'Enviando...',
-                link_text: '¿Olvidaste tu contraseña?',
-              },
-              update_password: {
-                password_label: 'Nueva contraseña',
-                password_input_placeholder: '••••••••',
-                button_label: 'Actualizar contraseña',
-                loading_button_label: 'Actualizando...',
-              },
-            },
-          }}
-          redirectTo={`${window.location.origin}/`}
-        />
+        <form onSubmit={handleLogin} className="space-y-6">
+          {/* Email Input */}
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="tu@email.com"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+              disabled={loading}
+            />
+          </div>
+
+          {/* Password Input */}
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              Contraseña
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+              disabled={loading}
+            />
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+          </button>
+        </form>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          SiReset v2.0 - Powered by Supabase + React
+          SiReset v2.0 - Acceso Restringido
+        </p>
+        <p className="text-center text-xs text-gray-400 mt-2">
+          Contacta al administrador para obtener acceso
         </p>
       </div>
     </div>
