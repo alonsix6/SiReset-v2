@@ -383,12 +383,17 @@ export default function Mapito({ user }) {
         })
       }
 
-      // Esperar a que se carguen los tiles si el basemap está activo
-      if (showBasemap) {
-        await new Promise(resolve => setTimeout(resolve, 1500))
-      } else {
-        await new Promise(resolve => setTimeout(resolve, 500))
-      }
+      // Forzar invalidación del tamaño del mapa para sincronizar tiles y GeoJSON
+      tempMap.invalidateSize()
+
+      // Esperar a que el mapa termine de renderizar y sincronizar
+      // Incluye tiempo extra para que tiles y GeoJSON se alineen correctamente
+      await new Promise(resolve => {
+        tempMap.once('moveend', () => {
+          // El mapa terminó de moverse, esperar un poco más para tiles
+          setTimeout(resolve, showBasemap ? 2000 : 800)
+        })
+      })
 
       // Importar html2canvas dinámicamente
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
