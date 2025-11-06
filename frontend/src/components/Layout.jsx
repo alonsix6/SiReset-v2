@@ -32,7 +32,7 @@ export default function Layout({ user, onLogout, children }) {
             {/* Logo */}
             <div className="flex items-center">
               <Link to="/" className="flex items-center group">
-                <span className="font-display text-2xl text-reset-white tracking-tight">
+                <span className="font-display text-3xl lg:text-4xl text-reset-white tracking-tight hover:scale-105 transition-transform duration-300">
                   SI<span className="text-reset-neon">RESET</span>
                 </span>
               </Link>
