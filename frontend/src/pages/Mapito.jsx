@@ -286,15 +286,13 @@ export default function Mapito({ user }) {
     })
   }
 
-  // Exportar a PNG - Solo el mapa con áreas seleccionadas
+  // Exportar a PNG - Solo las áreas seleccionadas, sin el resto del mapa
   const exportToPng = async () => {
     if (!mapRef.current || !geoData) return
 
     setExporting(true)
 
     try {
-      const map = mapRef.current
-
       // Obtener features seleccionados
       const selectedFeatures = geoData.features.filter(f => isSelected(f))
 
@@ -304,63 +302,76 @@ export default function Mapito({ user }) {
         return
       }
 
-      // Calcular bounds de las áreas seleccionadas
+      // Crear datos solo con features seleccionados
       const selectedData = {
         type: 'FeatureCollection',
         features: selectedFeatures
       }
 
-      // Crear un mapa temporal para exportar
+      // Crear un contenedor temporal
       const tempDiv = document.createElement('div')
       tempDiv.style.width = '1200px'
       tempDiv.style.height = '800px'
       tempDiv.style.position = 'absolute'
       tempDiv.style.left = '-9999px'
-      tempDiv.style.backgroundColor = 'transparent'
+      tempDiv.style.top = '0'
+      tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
       document.body.appendChild(tempDiv)
 
-      // Crear mapa temporal con fondo transparente
+      // Crear mapa temporal - importante: sin tiles para que solo se vean las áreas
       const tempMap = L.map(tempDiv, {
         zoomControl: false,
         attributionControl: false,
-        preferCanvas: true
+        preferCanvas: false  // Usar SVG para mejor calidad
       }).setView([-9.2, -75.0], 5)
 
-      // Solo agregar basemap si está activado
-      if (showBasemap) {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(tempMap)
+      // Asegurar que el contenedor de Leaflet tenga fondo transparente
+      const leafletContainer = tempDiv.querySelector('.leaflet-container')
+      if (leafletContainer && !showBasemap) {
+        leafletContainer.style.backgroundColor = 'transparent'
       }
 
-      // Agregar solo los features seleccionados
+      // Si showBasemap está activo, agregar el mapa base
+      let tileLayer = null
+      if (showBasemap) {
+        tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19
+        }).addTo(tempMap)
+      }
+
+      // Agregar SOLO los features seleccionados con el color seleccionado
       const geoJsonLayer = L.geoJSON(selectedData, {
-        style: (feature) => ({
+        style: {
           fillColor: colorSelected,
           fillOpacity: 0.95,
           color: showBorders ? colorBorder : colorSelected,
-          weight: showBorders ? grosorBorde : 0,
-        })
+          weight: showBorders ? grosorBorde : 0
+        }
       }).addTo(tempMap)
 
-      // Ajustar el mapa a los bounds de lo seleccionado
-      tempMap.fitBounds(geoJsonLayer.getBounds(), { padding: [50, 50] })
+      // Ajustar vista a las áreas seleccionadas
+      const bounds = geoJsonLayer.getBounds()
+      tempMap.fitBounds(bounds, { padding: [50, 50] })
 
-      // Esperar a que se carguen los tiles
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Usar leaflet-image o similar para capturar
-      // Como no tenemos leaflet-image, vamos a usar html2canvas o tomar screenshot del canvas
-
-      // Intentar obtener el canvas del mapa
-      const mapPane = tempDiv.querySelector('.leaflet-map-pane')
+      // Esperar a que se carguen los tiles si el basemap está activo
+      if (showBasemap) {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 300))
+      }
 
       // Importar html2canvas dinámicamente
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
 
+      // Capturar el mapa
       const canvas = await html2canvas(tempDiv, {
         useCORS: true,
         allowTaint: true,
-        backgroundColor: showBasemap ? '#ffffff' : null,  // null = transparente
-        scale: 2
+        backgroundColor: showBasemap ? '#ffffff' : null,
+        scale: 2,
+        logging: false,
+        width: 1200,
+        height: 800
       })
 
       // Convertir a PNG y descargar
