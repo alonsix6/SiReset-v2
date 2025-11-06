@@ -85,10 +85,12 @@ export default function Admin({ user }) {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando usuarios...</p>
+      <div className="section-reset">
+        <div className="container-reset">
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-reset-neon border-t-transparent mb-4"></div>
+            <p className="text-reset-gray-light text-lg">Cargando usuarios...</p>
+          </div>
         </div>
       </div>
     )
@@ -96,96 +98,164 @@ export default function Admin({ user }) {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
+      <div className="section-reset">
+        <div className="container-reset max-w-4xl">
+          <div className="alert-error">
+            <div className="flex items-center">
+              <span className="mr-2 text-2xl">⚠</span>
+              <span>{error}</span>
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Panel de Administración</h1>
-        <p className="text-gray-600 mt-2">Gestionar usuarios y permisos</p>
-      </div>
-
-      {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500">Total Usuarios</div>
-          <div className="mt-2 text-3xl font-semibold text-gray-900">{users.length}</div>
+    <div className="section-reset">
+      <div className="container-reset">
+        {/* Header */}
+        <div className="mb-12 animate-fade-in-up">
+          <div className="inline-block mb-4">
+            <span className="text-reset-magenta text-sm font-bold uppercase tracking-wider">
+              // PANEL DE CONTROL
+            </span>
+          </div>
+          <h1 className="font-display text-5xl lg:text-6xl text-reset-white mb-4 leading-tight">
+            ADMINISTRACIÓN
+          </h1>
+          <p className="text-reset-gray-light text-lg">
+            Gestión de usuarios y permisos del sistema
+          </p>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500">Administradores</div>
-          <div className="mt-2 text-3xl font-semibold text-purple-600">
-            {users.filter(u => u.user_metadata?.role === 'admin').length}
+
+        {/* Estadísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <div className="card-reset group hover:border-reset-cyan transition-all duration-300 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="text-reset-gray-light text-xs font-bold uppercase tracking-wider">
+                Total Usuarios
+              </div>
+              <div className="w-8 h-8 bg-reset-cyan bg-opacity-20 rounded-full flex items-center justify-center border border-reset-cyan">
+                <span className="text-reset-cyan text-xs">👥</span>
+              </div>
+            </div>
+            <div className="text-reset-cyan text-5xl font-display font-black">
+              {users.length}
+            </div>
+          </div>
+
+          <div className="card-reset group hover:border-reset-magenta transition-all duration-300 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="text-reset-gray-light text-xs font-bold uppercase tracking-wider">
+                Administradores
+              </div>
+              <div className="w-8 h-8 bg-reset-magenta bg-opacity-20 rounded-full flex items-center justify-center border border-reset-magenta">
+                <span className="text-reset-magenta text-xs">★</span>
+              </div>
+            </div>
+            <div className="text-reset-magenta text-5xl font-display font-black">
+              {users.filter(u => u.user_metadata?.role === 'admin').length}
+            </div>
+          </div>
+
+          <div className="card-reset group hover:border-reset-blue transition-all duration-300 animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="text-reset-gray-light text-xs font-bold uppercase tracking-wider">
+                Programadores
+              </div>
+              <div className="w-8 h-8 bg-reset-blue bg-opacity-20 rounded-full flex items-center justify-center border border-reset-blue">
+                <span className="text-reset-blue text-xs">⚡</span>
+              </div>
+            </div>
+            <div className="text-reset-blue text-5xl font-display font-black">
+              {users.filter(u => u.user_metadata?.role === 'programmer').length}
+            </div>
+          </div>
+
+          <div className="card-reset group hover:border-reset-neon transition-all duration-300 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="text-reset-gray-light text-xs font-bold uppercase tracking-wider">
+                Usuarios
+              </div>
+              <div className="w-8 h-8 bg-reset-neon bg-opacity-20 rounded-full flex items-center justify-center border border-reset-neon">
+                <span className="text-reset-neon text-xs">👤</span>
+              </div>
+            </div>
+            <div className="text-reset-neon text-5xl font-display font-black">
+              {users.filter(u => !u.user_metadata?.role || u.user_metadata?.role === 'user').length}
+            </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500">Programadores</div>
-          <div className="mt-2 text-3xl font-semibold text-blue-600">
-            {users.filter(u => u.user_metadata?.role === 'programmer').length}
+
+        {/* Tabla de usuarios */}
+        <div className="card-reset-shadow mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+          <div className="mb-6">
+            <h2 className="font-display text-3xl text-reset-white uppercase">
+              Usuarios <span className="text-reset-neon">Registrados</span>
+            </h2>
+          </div>
+
+          <div className="overflow-x-auto scrollbar-reset">
+            <table className="table-reset">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Rol</th>
+                  <th>Módulos</th>
+                  <th>Proveedor</th>
+                  <th>ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    onUpdateRole={updateUserRole}
+                    onUpdateModules={updateUserModules}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500">Usuarios</div>
-          <div className="mt-2 text-3xl font-semibold text-green-600">
-            {users.filter(u => !u.user_metadata?.role || u.user_metadata?.role === 'user').length}
+
+        {/* Información sobre roles */}
+        <div className="bg-reset-gray-dark border-l-4 border-reset-cyan rounded-reset p-6 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-reset-cyan bg-opacity-20 rounded-full flex items-center justify-center">
+                <span className="text-reset-cyan text-xl">ℹ</span>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-reset-white font-semibold mb-3 uppercase tracking-wide">
+                Información sobre Roles
+              </h3>
+              <ul className="text-reset-gray-light text-sm space-y-2">
+                <li className="flex items-start">
+                  <span className="text-reset-magenta mr-2 mt-0.5">▶</span>
+                  <div>
+                    <span className="text-reset-magenta font-semibold">Admin:</span> Acceso total, puede gestionar usuarios y todos los módulos
+                  </div>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-reset-blue mr-2 mt-0.5">▶</span>
+                  <div>
+                    <span className="text-reset-blue font-semibold">Programmer:</span> Acceso a todos los módulos, puede modificar configuraciones
+                  </div>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-reset-neon mr-2 mt-0.5">▶</span>
+                  <div>
+                    <span className="text-reset-neon font-semibold">User:</span> Acceso solo a los módulos asignados
+                  </div>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Tabla de usuarios */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Usuarios Registrados</h2>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Usuario
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rol
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Módulos
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Proveedor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((u) => (
-                <UserRow
-                  key={u.id}
-                  user={u}
-                  onUpdateRole={updateUserRole}
-                  onUpdateModules={updateUserModules}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Información adicional */}
-      <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="font-semibold text-blue-900 mb-2">ℹ️ Información sobre Roles</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li><strong>Admin:</strong> Acceso total, puede gestionar usuarios y todos los módulos</li>
-          <li><strong>Programmer:</strong> Acceso a todos los módulos, puede modificar configuraciones</li>
-          <li><strong>User:</strong> Acceso solo a los módulos asignados</li>
-        </ul>
       </div>
     </div>
   )
@@ -213,30 +283,36 @@ function UserRow({ user, onUpdateRole, onUpdateModules }) {
     setIsEditingModules(false)
   }
 
+  const getRoleBadgeColor = (role) => {
+    switch (role) {
+      case 'admin': return 'badge-reset bg-reset-magenta bg-opacity-20 text-reset-magenta border-reset-magenta'
+      case 'programmer': return 'badge-reset bg-reset-blue bg-opacity-20 text-reset-blue border-reset-blue'
+      default: return 'badge-neon'
+    }
+  }
+
   return (
     <tr>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <div>
-            <div className="text-sm font-medium text-gray-900">
-              {user.user_metadata?.name || user.email}
-            </div>
-            <div className="text-sm text-gray-500">{user.email}</div>
+      <td>
+        <div>
+          <div className="font-semibold text-reset-white mb-1">
+            {user.user_metadata?.name || user.email}
           </div>
+          <div className="text-sm text-reset-gray-light">{user.email}</div>
         </div>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
+      <td>
         <select
           value={currentRole}
           onChange={(e) => onUpdateRole(user.id, e.target.value)}
-          className="text-sm border border-gray-300 rounded px-2 py-1"
+          className="select-reset text-sm py-2"
         >
           <option value="user">Usuario</option>
           <option value="programmer">Programador</option>
           <option value="admin">Admin</option>
         </select>
       </td>
-      <td className="px-6 py-4">
+      <td>
         {isEditingModules ? (
           <div className="space-y-2">
             {availableModules.map(module => (
@@ -245,21 +321,21 @@ function UserRow({ user, onUpdateRole, onUpdateModules }) {
                   type="checkbox"
                   checked={selectedModules.includes(module)}
                   onChange={() => toggleModule(module)}
-                  className="rounded text-purple-600"
+                  className="checkbox-reset"
                 />
-                <span className="text-sm">{module}</span>
+                <span className="text-sm text-reset-white">{module}</span>
               </label>
             ))}
-            <div className="flex space-x-2 mt-2">
+            <div className="flex space-x-2 mt-3">
               <button
                 onClick={saveModules}
-                className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                className="px-3 py-1.5 bg-reset-neon text-reset-black text-xs font-bold uppercase rounded-reset-sm hover:bg-opacity-80 transition-all"
               >
                 Guardar
               </button>
               <button
                 onClick={() => setIsEditingModules(false)}
-                className="text-xs bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700"
+                className="px-3 py-1.5 bg-reset-gray-medium text-reset-white text-xs font-bold uppercase rounded-reset-sm hover:bg-reset-gray transition-all"
               >
                 Cancelar
               </button>
@@ -268,38 +344,40 @@ function UserRow({ user, onUpdateRole, onUpdateModules }) {
         ) : (
           <div>
             {currentRole === 'admin' ? (
-              <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+              <span className={getRoleBadgeColor('admin')}>
                 Todos los módulos
               </span>
             ) : (
-              <>
-                <div className="flex flex-wrap gap-1">
+              <div>
+                <div className="flex flex-wrap gap-2 mb-2">
                   {(user.user_metadata?.modules || []).map(module => (
-                    <span
-                      key={module}
-                      className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"
-                    >
+                    <span key={module} className="badge-blue">
                       {module}
                     </span>
                   ))}
+                  {(user.user_metadata?.modules || []).length === 0 && (
+                    <span className="text-reset-gray-light text-sm">Sin módulos</span>
+                  )}
                 </div>
                 <button
                   onClick={() => setIsEditingModules(true)}
-                  className="text-xs text-purple-600 hover:underline mt-1"
+                  className="text-xs text-reset-neon hover:text-reset-cyan font-semibold uppercase tracking-wide transition-colors"
                 >
-                  Editar módulos
+                  Editar módulos →
                 </button>
-              </>
+              </div>
             )}
           </div>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {user.app_metadata?.provider || 'email'}
+      <td>
+        <span className="text-sm text-reset-gray-light">
+          {user.app_metadata?.provider || 'email'}
+        </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm">
-        <span className="text-xs text-gray-500">
-          ID: {user.id.substring(0, 8)}...
+      <td>
+        <span className="text-xs font-mono text-reset-gray-light">
+          {user.id.substring(0, 8)}...
         </span>
       </td>
     </tr>

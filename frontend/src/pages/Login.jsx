@@ -99,71 +99,116 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-500">
-      <div className="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">SiReset</h1>
-          <p className="text-gray-600">Suite de Herramientas para Reset</p>
+    <div className="min-h-screen flex items-center justify-center bg-reset-black relative overflow-hidden">
+      {/* Background Decorative Elements */}
+      <div className="absolute inset-0 overflow-hidden opacity-20">
+        <div className="absolute top-20 right-20 w-96 h-96 border border-reset-neon rounded-full"></div>
+        <div className="absolute bottom-20 left-20 w-72 h-72 border border-reset-cyan rounded-full"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] border border-reset-purple rounded-full"></div>
+      </div>
+
+      {/* Login Card */}
+      <div className="relative z-10 w-full max-w-md px-6">
+        <div className="bg-reset-gray-dark border border-reset-gray-medium rounded-reset p-8 lg:p-10 shadow-reset-lg">
+          {/* Logo & Title */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-gradient-neon rounded-reset flex items-center justify-center">
+                <span className="text-reset-black font-display text-4xl font-black">R</span>
+              </div>
+            </div>
+            <h1 className="font-display text-4xl lg:text-5xl text-reset-white mb-2 tracking-tight">
+              SI<span className="text-reset-neon">RESET</span>
+            </h1>
+            <p className="text-reset-gray-light text-sm uppercase tracking-wider">
+              Suite de Herramientas para Reset
+            </p>
+          </div>
+
+          {/* Login Form */}
+          <form onSubmit={handleLogin} className="space-y-6">
+            {/* Email Input */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-semibold text-reset-white mb-2 uppercase tracking-wide">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="tu@email.com"
+                className="input-reset"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Password Input */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-semibold text-reset-white mb-2 uppercase tracking-wide">
+                Contraseña
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                className="input-reset"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="alert-error animate-fade-in">
+                <div className="flex items-center">
+                  <span className="mr-2">⚠</span>
+                  <span>{error}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full ${loading ? 'btn-disabled' : 'btn-primary'}`}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-reset-black mr-2"></div>
+                  Iniciando sesión...
+                </div>
+              ) : (
+                'Iniciar Sesión'
+              )}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="divider-reset"></div>
+
+          {/* Footer Info */}
+          <div className="text-center space-y-2">
+            <p className="text-reset-gray-light text-sm">
+              <span className="font-display text-reset-white">SIRESET</span> v2.0 - Acceso Restringido
+            </p>
+            <p className="text-reset-gray text-xs">
+              Contacta al administrador para obtener acceso
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          {/* Email Input */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="tu@email.com"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
-              disabled={loading}
-            />
+        {/* Powered by Reset */}
+        <div className="mt-6 text-center">
+          <div className="flex items-center justify-center space-x-2">
+            <span className="text-reset-gray-light text-sm">Powered by</span>
+            <span className="font-display text-reset-neon text-xl">RESET</span>
           </div>
-
-          {/* Password Input */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
-              disabled={loading}
-            />
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          SiReset v2.0 - Acceso Restringido
-        </p>
-        <p className="text-center text-xs text-gray-400 mt-2">
-          Contacta al administrador para obtener acceso
-        </p>
+        </div>
       </div>
     </div>
   )

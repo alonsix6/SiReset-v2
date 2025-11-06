@@ -2,21 +2,287 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   RESET AGENCIA - GLOBAL STYLES
+   Sistema de diseño basado en la identidad visual de Reset
+   ============================================ */
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  background-color: #000000;
+  color: #FFFFFF;
+  font-family: 'Montserrat', 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
+    'Helvetica Neue', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  background-color: #1A1A1A;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #00FF85;
+}
+
+/* ============================================
+   TIPOGRAFÍA
+   ============================================ */
+
+h1, .h1 {
+  font-family: 'Bebas Neue', 'Anton', 'Archivo Black', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+
+h2, .h2 {
+  font-family: 'Bebas Neue', 'Anton', 'Archivo Black', sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+
+h3, .h3 {
+  font-family: 'Montserrat', 'Inter', sans-serif;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+/* ============================================
+   COMPONENTES PERSONALIZADOS
+   ============================================ */
+
+@layer components {
+  /* Botón Principal */
+  .btn-primary {
+    @apply px-6 py-3 rounded-reset-sm font-body font-bold text-sm uppercase
+           tracking-wider bg-gradient-neon text-reset-black
+           hover:bg-reset-white hover:scale-105
+           transition-all duration-300 ease-out
+           shadow-reset-sm hover:shadow-reset;
+  }
+
+  /* Botón Secundario (Ghost) */
+  .btn-secondary {
+    @apply px-6 py-3 rounded-reset-sm font-body font-bold text-sm uppercase
+           tracking-wider bg-transparent text-reset-neon border-2 border-reset-neon
+           hover:bg-reset-neon hover:text-reset-black
+           transition-all duration-300 ease-out;
+  }
+
+  /* Botón Peligro */
+  .btn-danger {
+    @apply px-6 py-3 rounded-reset-sm font-body font-bold text-sm uppercase
+           tracking-wider bg-reset-magenta text-white
+           hover:bg-opacity-80 hover:scale-105
+           transition-all duration-300 ease-out;
+  }
+
+  /* Botón Deshabilitado */
+  .btn-disabled {
+    @apply px-6 py-3 rounded-reset-sm font-body font-bold text-sm uppercase
+           tracking-wider bg-reset-gray-medium text-reset-gray-light
+           cursor-not-allowed opacity-50;
+  }
+
+  /* Input de texto */
+  .input-reset {
+    @apply w-full px-4 py-3 rounded-reset-sm
+           bg-reset-gray-dark border border-reset-gray-medium
+           text-reset-white placeholder-reset-gray-light
+           focus:outline-none focus:border-reset-neon focus:ring-2 focus:ring-reset-neon focus:ring-opacity-20
+           transition-all duration-200;
+  }
+
+  /* Select / Dropdown */
+  .select-reset {
+    @apply w-full px-4 py-3 rounded-reset-sm
+           bg-reset-gray-dark border border-reset-gray-medium
+           text-reset-white
+           focus:outline-none focus:border-reset-neon focus:ring-2 focus:ring-reset-neon focus:ring-opacity-20
+           transition-all duration-200;
+  }
+
+  /* Checkbox */
+  .checkbox-reset {
+    @apply w-5 h-5 rounded
+           bg-reset-gray-dark border-2 border-reset-gray-medium
+           text-reset-neon
+           focus:ring-2 focus:ring-reset-neon focus:ring-opacity-20;
+  }
+
+  /* Card / Tarjeta */
+  .card-reset {
+    @apply bg-reset-gray-dark border border-reset-gray-medium
+           rounded-reset p-6
+           hover:border-reset-neon hover:-translate-y-1
+           transition-all duration-300 ease-out;
+  }
+
+  /* Card con sombra */
+  .card-reset-shadow {
+    @apply card-reset hover:shadow-reset;
+  }
+
+  /* Separador decorativo */
+  .divider-reset {
+    @apply h-px w-full my-12
+           bg-gradient-to-r from-transparent via-reset-neon to-transparent;
+  }
+
+  /* Badge / Etiqueta */
+  .badge-reset {
+    @apply inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide;
+  }
+
+  .badge-neon {
+    @apply badge-reset bg-reset-neon bg-opacity-20 text-reset-neon border border-reset-neon;
+  }
+
+  .badge-blue {
+    @apply badge-reset bg-reset-blue bg-opacity-20 text-reset-blue-light border border-reset-blue-light;
+  }
+
+  .badge-purple {
+    @apply badge-reset bg-reset-purple bg-opacity-20 text-reset-purple border border-reset-purple;
+  }
+
+  /* Tabla */
+  .table-reset {
+    @apply w-full border-collapse;
+  }
+
+  .table-reset th {
+    @apply bg-reset-violet text-reset-white font-bold uppercase text-sm
+           px-4 py-3 text-left border border-reset-gray-medium;
+  }
+
+  .table-reset td {
+    @apply px-4 py-3 border border-reset-gray-medium text-reset-white;
+  }
+
+  .table-reset tbody tr:nth-child(odd) {
+    @apply bg-reset-black;
+  }
+
+  .table-reset tbody tr:nth-child(even) {
+    @apply bg-reset-gray-dark;
+  }
+
+  .table-reset tbody tr:hover {
+    @apply bg-reset-gray-medium;
+  }
+
+  /* Alert / Mensaje */
+  .alert-reset {
+    @apply px-4 py-3 rounded-reset border;
+  }
+
+  .alert-success {
+    @apply alert-reset bg-reset-neon bg-opacity-10 border-reset-neon text-reset-neon;
+  }
+
+  .alert-error {
+    @apply alert-reset bg-reset-magenta bg-opacity-10 border-reset-magenta text-reset-magenta;
+  }
+
+  .alert-warning {
+    @apply alert-reset bg-yellow-500 bg-opacity-10 border-yellow-500 text-yellow-400;
+  }
+
+  .alert-info {
+    @apply alert-reset bg-reset-cyan bg-opacity-10 border-reset-cyan text-reset-cyan;
+  }
+}
+
+/* ============================================
+   UTILIDADES PERSONALIZADAS
+   ============================================ */
+
+@layer utilities {
+  /* Texto con gradiente neón */
+  .text-gradient-neon {
+    @apply bg-gradient-neon bg-clip-text text-transparent;
+  }
+
+  /* Texto con gradiente púrpura */
+  .text-gradient-purple {
+    @apply bg-gradient-purple bg-clip-text text-transparent;
+  }
+
+  /* Contenedor principal */
+  .container-reset {
+    @apply max-w-7xl mx-auto px-6 lg:px-8;
+  }
+
+  /* Sección con padding */
+  .section-reset {
+    @apply py-16 lg:py-24;
+  }
+
+  /* Scrollbar personalizado */
+  .scrollbar-reset::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-reset::-webkit-scrollbar-track {
+    background: #1A1A1A;
+  }
+
+  .scrollbar-reset::-webkit-scrollbar-thumb {
+    background: #00FF85;
+    border-radius: 4px;
+  }
+
+  .scrollbar-reset::-webkit-scrollbar-thumb:hover {
+    background: #00E5FF;
+  }
+}
+
+/* ============================================
+   ANIMACIONES
+   ============================================ */
+
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.animate-on-scroll.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+/* Ajustes para mobile */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  .container-reset {
+    @apply px-4;
+  }
+
+  .section-reset {
+    @apply py-12;
+  }
 }
