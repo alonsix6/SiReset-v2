@@ -112,11 +112,6 @@ export default function Login({ onLogin }) {
         <div className="bg-reset-gray-dark border border-reset-gray-medium rounded-reset p-8 lg:p-10 shadow-reset-lg">
           {/* Logo & Title */}
           <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-gradient-neon rounded-reset flex items-center justify-center">
-                <span className="text-reset-black font-display text-4xl font-black">R</span>
-              </div>
-            </div>
             <h1 className="font-display text-4xl lg:text-5xl text-reset-white mb-2 tracking-tight">
               SI<span className="text-reset-neon">RESET</span>
             </h1>
@@ -202,11 +197,11 @@ export default function Login({ onLogin }) {
           </div>
         </div>
 
-        {/* Powered by Reset */}
+        {/* Powered by Research */}
         <div className="mt-6 text-center">
           <div className="flex items-center justify-center space-x-2">
             <span className="text-reset-gray-light text-sm">Powered by</span>
-            <span className="font-display text-reset-neon text-xl">RESET</span>
+            <span className="font-display text-reset-neon text-xl">RESEARCH</span>
           </div>
         </div>
       </div>

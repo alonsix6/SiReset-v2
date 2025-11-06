@@ -34,11 +34,6 @@ export default function AuthCallback() {
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="bg-reset-gray-dark border border-reset-gray-medium rounded-reset p-10 shadow-reset-lg">
           <div className="flex flex-col items-center space-y-6">
-            {/* Logo */}
-            <div className="w-16 h-16 bg-gradient-neon rounded-reset flex items-center justify-center animate-pulse">
-              <span className="text-reset-black font-display text-4xl font-black">R</span>
-            </div>
-
             {/* Spinner */}
             <div className="relative">
               <div className="animate-spin rounded-full h-16 w-16 border-4 border-reset-neon border-t-transparent"></div>

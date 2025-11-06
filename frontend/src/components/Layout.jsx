@@ -31,10 +31,7 @@ export default function Layout({ user, onLogout, children }) {
           <div className="flex justify-between items-center h-20">
             {/* Logo */}
             <div className="flex items-center">
-              <Link to="/" className="flex items-center space-x-3 group">
-                <div className="w-10 h-10 bg-gradient-neon rounded-reset-sm flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
-                  <span className="text-reset-black font-display text-2xl font-black">R</span>
-                </div>
+              <Link to="/" className="flex items-center group">
                 <span className="font-display text-2xl text-reset-white tracking-tight">
                   SI<span className="text-reset-neon">RESET</span>
                 </span>
@@ -118,7 +115,7 @@ export default function Layout({ user, onLogout, children }) {
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-reset-gray-light text-sm">Powered by</span>
-              <span className="font-display text-reset-neon text-lg">RESET</span>
+              <span className="font-display text-reset-neon text-lg">RESEARCH</span>
             </div>
           </div>
         </div>
