@@ -326,28 +326,20 @@ export default function Mapito({ user }) {
         preferCanvas: false
       }).setView([-9.2, -75.0], 5)
 
-      // Asegurar que el contenedor de Leaflet tenga fondo transparente si es necesario
+      // Asegurar que el contenedor de Leaflet tenga fondo transparente
       const leafletContainer = tempDiv.querySelector('.leaflet-container')
       if (leafletContainer && !showBasemap) {
         leafletContainer.style.backgroundColor = 'transparent'
       }
 
-      // Si showBasemap está activo, agregar tiles PRIMERO
+      // Si showBasemap está activo, agregar el mapa base
       if (showBasemap) {
-        const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19
         }).addTo(tempMap)
-
-        // Esperar a que los tiles se carguen
-        await new Promise(resolve => {
-          tileLayer.on('load', () => {
-            setTimeout(resolve, 500)
-          })
-          setTimeout(resolve, 2000) // Fallback
-        })
       }
 
-      // Agregar GeoJSON
+      // Agregar GeoJSON según el contexto
       const dataToRender = includeContext ? geoData : selectedData
 
       const geoJsonLayer = L.geoJSON(dataToRender, {
@@ -371,29 +363,19 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      // Calcular bounds del GeoJSON
+      // Ajustar vista - VOLVER A LA LÓGICA SIMPLE QUE FUNCIONABA
       const bounds = geoJsonLayer.getBounds()
-
-      // Aplicar fitBounds con padding generoso para evitar cortes
-      // Más padding = selección más pequeña = más margen de seguridad
-      const padding = showBasemap ? 200 : 350  // Sin basemap: más padding para seguridad
+      const padding = showBasemap ? [100, 100] : [50, 50]  // Padding moderado
       tempMap.fitBounds(bounds, {
-        paddingTopLeft: [padding, padding],
-        paddingBottomRight: [padding, padding],
+        padding: padding,
         maxZoom: 18
       })
 
-      // Solo para basemap: esperar sincronización adicional
+      // Esperar a que se carguen los tiles si el basemap está activo
       if (showBasemap) {
-        tempMap.invalidateSize()
-        await new Promise(resolve => {
-          tempMap.once('moveend', () => {
-            setTimeout(resolve, 1000)
-          })
-        })
+        await new Promise(resolve => setTimeout(resolve, 1500))
       } else {
-        // Sin basemap: espera mínima como en modo 1
-        await new Promise(resolve => setTimeout(resolve, 300))
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
 
       // Importar html2canvas dinámicamente
@@ -411,12 +393,7 @@ export default function Mapito({ user }) {
       })
 
       // Función para recortar el canvas eliminando áreas transparentes
-      const cropCanvas = (sourceCanvas, skipCrop = false) => {
-        // Si skipCrop es true, retornar canvas original sin procesar
-        if (skipCrop) {
-          return sourceCanvas
-        }
-
+      const cropCanvas = (sourceCanvas) => {
         const ctx = sourceCanvas.getContext('2d')
         const imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
         const pixels = imageData.data
@@ -431,14 +408,9 @@ export default function Mapito({ user }) {
           for (let x = 0; x < sourceCanvas.width; x++) {
             const index = (y * sourceCanvas.width + x) * 4
             const alpha = pixels[index + 3]
-            const red = pixels[index]
-            const green = pixels[index + 1]
-            const blue = pixels[index + 2]
 
-            // Detectar cualquier píxel con contenido
-            const hasContent = alpha > 10 || (red > 0 || green > 0 || blue > 0)
-
-            if (hasContent) {
+            // Detectar píxeles no transparentes
+            if (alpha > 10) {
               if (x < minX) minX = x
               if (x > maxX) maxX = x
               if (y < minY) minY = y
@@ -447,14 +419,8 @@ export default function Mapito({ user }) {
           }
         }
 
-        // Si no se encontró contenido, retornar original
-        if (minX >= maxX || minY >= maxY) {
-          console.log('No se encontró contenido para recortar')
-          return sourceCanvas
-        }
-
-        // Agregar margen generoso
-        const margin = 150
+        // Agregar margen de seguridad
+        const margin = 20
         minX = Math.max(0, minX - margin)
         minY = Math.max(0, minY - margin)
         maxX = Math.min(sourceCanvas.width - 1, maxX + margin)
@@ -462,12 +428,6 @@ export default function Mapito({ user }) {
 
         const croppedWidth = maxX - minX + 1
         const croppedHeight = maxY - minY + 1
-
-        // Validación de seguridad
-        if (croppedWidth <= 0 || croppedHeight <= 0) {
-          console.log('Dimensiones de recorte inválidas, retornando original')
-          return sourceCanvas
-        }
 
         // Crear nuevo canvas con el tamaño recortado
         const croppedCanvas = document.createElement('canvas')
@@ -485,11 +445,8 @@ export default function Mapito({ user }) {
         return croppedCanvas
       }
 
-      // Decisión de recorte:
-      // - Con basemap: NO recortar (mantener fondo blanco completo)
-      // - Sin basemap: SIEMPRE recortar (modo 1 y modo 3, transparente optimizado)
-      const shouldSkipCrop = showBasemap
-      const finalCanvas = cropCanvas(canvas, shouldSkipCrop)
+      // Recortar solo si no hay basemap (para optimizar tamaño)
+      const finalCanvas = showBasemap ? canvas : cropCanvas(canvas)
 
       // Convertir a PNG y descargar
       finalCanvas.toBlob((blob) => {
