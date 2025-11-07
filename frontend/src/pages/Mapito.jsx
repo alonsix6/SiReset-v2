@@ -317,19 +317,13 @@ export default function Mapito({ user }) {
       tempDiv.style.left = '-9999px'
       tempDiv.style.top = '0'
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
-
-      // Agregar al DOM primero y esperar a que se renderice
       document.body.appendChild(tempDiv)
 
-      // Esperar a que el DOM se actualice
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // Crear mapa temporal con vista inicial centrada en Perú
+      // Crear mapa temporal
       const tempMap = L.map(tempDiv, {
         zoomControl: false,
         attributionControl: false,
-        preferCanvas: false,  // Usar SVG para mejor calidad
-        crs: L.CRS.EPSG3857  // Asegurar sistema de coordenadas estándar
+        preferCanvas: false
       }).setView([-9.2, -75.0], 5)
 
       // Asegurar que el contenedor de Leaflet tenga fondo transparente si es necesario
@@ -338,41 +332,25 @@ export default function Mapito({ user }) {
         leafletContainer.style.backgroundColor = 'transparent'
       }
 
-      // PASO 1: Forzar invalidación ANTES de agregar capas
-      tempMap.invalidateSize()
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // PASO 2: Si showBasemap está activo, agregar tiles PRIMERO y esperar carga completa
+      // Si showBasemap está activo, agregar tiles PRIMERO
       if (showBasemap) {
         const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          minZoom: 1
+          maxZoom: 19
         }).addTo(tempMap)
 
-        // Esperar carga completa de tiles
+        // Esperar a que los tiles se carguen
         await new Promise(resolve => {
-          let loaded = false
           tileLayer.on('load', () => {
-            if (!loaded) {
-              loaded = true
-              setTimeout(resolve, 800)  // Espera adicional para render completo
-            }
+            setTimeout(resolve, 500)
           })
-          // Fallback
-          setTimeout(() => {
-            if (!loaded) {
-              loaded = true
-              resolve()
-            }
-          }, 3000)
+          setTimeout(resolve, 2000) // Fallback
         })
       }
 
-      // PASO 3: AHORA agregar GeoJSON después de que tiles estén completamente renderizados
-      let geoJsonLayer
+      // Agregar GeoJSON
       const dataToRender = includeContext ? geoData : selectedData
 
-      geoJsonLayer = L.geoJSON(dataToRender, {
+      const geoJsonLayer = L.geoJSON(dataToRender, {
         style: (feature) => {
           if (includeContext) {
             const selected = isSelected(feature)
@@ -393,59 +371,29 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      // Esperar a que el GeoJSON se agregue
-      await new Promise(resolve => setTimeout(resolve, 200))
-
-      // PASO 4: Calcular bounds y centrar CORRECTAMENTE
+      // Calcular bounds del GeoJSON
       const bounds = geoJsonLayer.getBounds()
-      const center = bounds.getCenter()
 
-      // Primero setear el centro explícitamente
-      tempMap.setView(center, tempMap.getZoom())
+      // Aplicar fitBounds con padding uniforme - SIMPLE como el modo 1 que funciona
+      const padding = 200
+      tempMap.fitBounds(bounds, {
+        paddingTopLeft: [padding, padding],
+        paddingBottomRight: [padding, padding],
+        maxZoom: 18
+      })
 
-      // Invalidar tamaño de nuevo para asegurar coordenadas correctas
-      tempMap.invalidateSize()
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // PASO 5: Ahora hacer fitBounds con padding apropiado
-      if (includeContext) {
-        // Con contexto: padding más grande (10% del tamaño del contenedor)
-        const largePadding = 240  // 10% de 2400px
-        tempMap.fitBounds(bounds, {
-          paddingTopLeft: [largePadding, largePadding],
-          paddingBottomRight: [largePadding, largePadding],
-          maxZoom: 18,
-          animate: false
+      // Solo para basemap: esperar sincronización adicional
+      if (showBasemap) {
+        tempMap.invalidateSize()
+        await new Promise(resolve => {
+          tempMap.once('moveend', () => {
+            setTimeout(resolve, 1000)
+          })
         })
       } else {
-        // Sin contexto: padding moderado para zoom cercano
-        const padding = 200
-        tempMap.fitBounds(bounds, {
-          paddingTopLeft: [padding, padding],
-          paddingBottomRight: [padding, padding],
-          maxZoom: 18,
-          animate: false
-        })
+        // Sin basemap: espera mínima como en modo 1
+        await new Promise(resolve => setTimeout(resolve, 300))
       }
-
-      // PASO 6: Esperar sincronización completa después de fitBounds
-      await new Promise(resolve => {
-        let moved = false
-        tempMap.once('moveend', () => {
-          if (!moved) {
-            moved = true
-            // Espera final para asegurar que todo esté renderizado
-            setTimeout(resolve, showBasemap ? 2000 : 800)
-          }
-        })
-        // Fallback
-        setTimeout(() => {
-          if (!moved) {
-            moved = true
-            resolve()
-          }
-        }, showBasemap ? 4000 : 2000)
-      })
 
       // Importar html2canvas dinámicamente
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
@@ -537,9 +485,9 @@ export default function Mapito({ user }) {
       }
 
       // Decisión de recorte:
-      // - Con basemap o includeContext: NO recortar para mantener dimensiones completas
-      // - Solo selección sin basemap: recortar para optimizar tamaño
-      const shouldSkipCrop = showBasemap || includeContext
+      // - Con basemap: NO recortar (mantener fondo blanco completo)
+      // - Sin basemap: SIEMPRE recortar (modo 1 y modo 3, transparente optimizado)
+      const shouldSkipCrop = showBasemap
       const finalCanvas = cropCanvas(canvas, shouldSkipCrop)
 
       // Convertir a PNG y descargar
