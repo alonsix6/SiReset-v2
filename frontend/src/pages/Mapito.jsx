@@ -317,34 +317,64 @@ export default function Mapito({ user }) {
       tempDiv.style.left = '-9999px'
       tempDiv.style.top = '0'
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
+
+      // Agregar al DOM primero y esperar a que se renderice
       document.body.appendChild(tempDiv)
 
-      // Crear mapa temporal
+      // Esperar a que el DOM se actualice
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Crear mapa temporal con vista inicial centrada en Perú
       const tempMap = L.map(tempDiv, {
         zoomControl: false,
         attributionControl: false,
-        preferCanvas: false  // Usar SVG para mejor calidad
+        preferCanvas: false,  // Usar SVG para mejor calidad
+        crs: L.CRS.EPSG3857  // Asegurar sistema de coordenadas estándar
       }).setView([-9.2, -75.0], 5)
 
-      // Asegurar que el contenedor de Leaflet tenga fondo transparente
+      // Asegurar que el contenedor de Leaflet tenga fondo transparente si es necesario
       const leafletContainer = tempDiv.querySelector('.leaflet-container')
       if (leafletContainer && !showBasemap) {
         leafletContainer.style.backgroundColor = 'transparent'
       }
 
-      // Si showBasemap está activo, agregar el mapa base
+      // PASO 1: Forzar invalidación ANTES de agregar capas
+      tempMap.invalidateSize()
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // PASO 2: Si showBasemap está activo, agregar tiles PRIMERO y esperar carga completa
       if (showBasemap) {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19
+        const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          minZoom: 1
         }).addTo(tempMap)
+
+        // Esperar carga completa de tiles
+        await new Promise(resolve => {
+          let loaded = false
+          tileLayer.on('load', () => {
+            if (!loaded) {
+              loaded = true
+              setTimeout(resolve, 800)  // Espera adicional para render completo
+            }
+          })
+          // Fallback
+          setTimeout(() => {
+            if (!loaded) {
+              loaded = true
+              resolve()
+            }
+          }, 3000)
+        })
       }
 
-      // Decidir qué features agregar según includeContext
+      // PASO 3: AHORA agregar GeoJSON después de que tiles estén completamente renderizados
       let geoJsonLayer
-      if (includeContext) {
-        // Agregar TODO el mapa con estilos diferenciados
-        geoJsonLayer = L.geoJSON(geoData, {
-          style: (feature) => {
+      const dataToRender = includeContext ? geoData : selectedData
+
+      geoJsonLayer = L.geoJSON(dataToRender, {
+        style: (feature) => {
+          if (includeContext) {
             const selected = isSelected(feature)
             return {
               fillColor: selected ? colorSelected : colorGeneral,
@@ -352,47 +382,69 @@ export default function Mapito({ user }) {
               color: showBorders ? colorBorder : (selected ? colorSelected : colorGeneral),
               weight: showBorders ? grosorBorde : 0
             }
+          } else {
+            return {
+              fillColor: colorSelected,
+              fillOpacity: 0.95,
+              color: showBorders ? colorBorder : colorSelected,
+              weight: showBorders ? grosorBorde : 0
+            }
           }
-        }).addTo(tempMap)
-      } else {
-        // Agregar SOLO los features seleccionados
-        geoJsonLayer = L.geoJSON(selectedData, {
-          style: {
-            fillColor: colorSelected,
-            fillOpacity: 0.95,
-            color: showBorders ? colorBorder : colorSelected,
-            weight: showBorders ? grosorBorde : 0
-          }
-        }).addTo(tempMap)
-      }
+        }
+      }).addTo(tempMap)
 
-      // Ajustar vista según el contexto
+      // Esperar a que el GeoJSON se agregue
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // PASO 4: Calcular bounds y centrar CORRECTAMENTE
       const bounds = geoJsonLayer.getBounds()
+      const center = bounds.getCenter()
 
+      // Primero setear el centro explícitamente
+      tempMap.setView(center, tempMap.getZoom())
+
+      // Invalidar tamaño de nuevo para asegurar coordenadas correctas
+      tempMap.invalidateSize()
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // PASO 5: Ahora hacer fitBounds con padding apropiado
       if (includeContext) {
-        // Con contexto: mostrar todo el mapa de Perú
-        tempMap.fitBounds(bounds, { padding: [100, 100] })
+        // Con contexto: padding más grande (10% del tamaño del contenedor)
+        const largePadding = 240  // 10% de 2400px
+        tempMap.fitBounds(bounds, {
+          paddingTopLeft: [largePadding, largePadding],
+          paddingBottomRight: [largePadding, largePadding],
+          maxZoom: 18,
+          animate: false
+        })
       } else {
-        // Sin contexto: centrar la selección con márgenes uniformes
-        // Usar paddingTopLeft y paddingBottomRight para asegurar centramiento perfecto
-        const padding = showBasemap ? 200 : 200  // Padding generoso y uniforme
+        // Sin contexto: padding moderado para zoom cercano
+        const padding = 200
         tempMap.fitBounds(bounds, {
           paddingTopLeft: [padding, padding],
           paddingBottomRight: [padding, padding],
-          maxZoom: 18
+          maxZoom: 18,
+          animate: false
         })
       }
 
-      // Forzar invalidación del tamaño del mapa para sincronizar tiles y GeoJSON
-      tempMap.invalidateSize()
-
-      // Esperar a que el mapa termine de renderizar y sincronizar
-      // Incluye tiempo extra para que tiles y GeoJSON se alineen correctamente
+      // PASO 6: Esperar sincronización completa después de fitBounds
       await new Promise(resolve => {
+        let moved = false
         tempMap.once('moveend', () => {
-          // El mapa terminó de moverse, esperar un poco más para tiles
-          setTimeout(resolve, showBasemap ? 2000 : 800)
+          if (!moved) {
+            moved = true
+            // Espera final para asegurar que todo esté renderizado
+            setTimeout(resolve, showBasemap ? 2000 : 800)
+          }
         })
+        // Fallback
+        setTimeout(() => {
+          if (!moved) {
+            moved = true
+            resolve()
+          }
+        }, showBasemap ? 4000 : 2000)
       })
 
       // Importar html2canvas dinámicamente
@@ -410,7 +462,12 @@ export default function Mapito({ user }) {
       })
 
       // Función para recortar el canvas eliminando áreas transparentes
-      const cropCanvas = (sourceCanvas) => {
+      const cropCanvas = (sourceCanvas, skipCrop = false) => {
+        // Si skipCrop es true, retornar canvas original sin procesar
+        if (skipCrop) {
+          return sourceCanvas
+        }
+
         const ctx = sourceCanvas.getContext('2d')
         const imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
         const pixels = imageData.data
@@ -421,7 +478,6 @@ export default function Mapito({ user }) {
         let maxY = 0
 
         // Encontrar los límites del contenido no transparente
-        // Usar umbral bajo para detectar incluso píxeles semi-transparentes
         for (let y = 0; y < sourceCanvas.height; y++) {
           for (let x = 0; x < sourceCanvas.width; x++) {
             const index = (y * sourceCanvas.width + x) * 4
@@ -430,10 +486,10 @@ export default function Mapito({ user }) {
             const green = pixels[index + 1]
             const blue = pixels[index + 2]
 
-            // Detectar cualquier píxel con contenido (alpha > 10 o tiene color)
+            // Detectar cualquier píxel con contenido
             const hasContent = alpha > 10 || (red > 0 || green > 0 || blue > 0)
 
-            if (hasContent || showBasemap) {
+            if (hasContent) {
               if (x < minX) minX = x
               if (x > maxX) maxX = x
               if (y < minY) minY = y
@@ -442,8 +498,14 @@ export default function Mapito({ user }) {
           }
         }
 
-        // Agregar un margen muy generoso para evitar cortes
-        const margin = 150  // Margen extra grande para garantizar seguridad
+        // Si no se encontró contenido, retornar original
+        if (minX >= maxX || minY >= maxY) {
+          console.log('No se encontró contenido para recortar')
+          return sourceCanvas
+        }
+
+        // Agregar margen generoso
+        const margin = 150
         minX = Math.max(0, minX - margin)
         minY = Math.max(0, minY - margin)
         maxX = Math.min(sourceCanvas.width - 1, maxX + margin)
@@ -452,14 +514,9 @@ export default function Mapito({ user }) {
         const croppedWidth = maxX - minX + 1
         const croppedHeight = maxY - minY + 1
 
-        // Si el contenido está muy cerca de los bordes, no hacer crop
-        // para evitar cortes accidentales
-        const minSafeMargin = 50
-        if (minX < minSafeMargin || minY < minSafeMargin ||
-            maxX > sourceCanvas.width - minSafeMargin ||
-            maxY > sourceCanvas.height - minSafeMargin) {
-          // Contenido muy cerca de los bordes, retornar canvas original
-          console.log('Contenido cerca de bordes, no se hace crop por seguridad')
+        // Validación de seguridad
+        if (croppedWidth <= 0 || croppedHeight <= 0) {
+          console.log('Dimensiones de recorte inválidas, retornando original')
           return sourceCanvas
         }
 
@@ -479,9 +536,11 @@ export default function Mapito({ user }) {
         return croppedCanvas
       }
 
-      // Recortar el canvas para eliminar espacios vacíos
-      // No recortar si incluye contexto o basemap
-      const finalCanvas = (showBasemap || includeContext) ? canvas : cropCanvas(canvas)
+      // Decisión de recorte:
+      // - Con basemap o includeContext: NO recortar para mantener dimensiones completas
+      // - Solo selección sin basemap: recortar para optimizar tamaño
+      const shouldSkipCrop = showBasemap || includeContext
+      const finalCanvas = cropCanvas(canvas, shouldSkipCrop)
 
       // Convertir a PNG y descargar
       finalCanvas.toBlob((blob) => {
