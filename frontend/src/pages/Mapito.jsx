@@ -374,8 +374,9 @@ export default function Mapito({ user }) {
       // Calcular bounds del GeoJSON
       const bounds = geoJsonLayer.getBounds()
 
-      // Aplicar fitBounds con padding uniforme - SIMPLE como el modo 1 que funciona
-      const padding = 200
+      // Aplicar fitBounds con padding generoso para evitar cortes
+      // Más padding = selección más pequeña = más margen de seguridad
+      const padding = showBasemap ? 200 : 350  // Sin basemap: más padding para seguridad
       tempMap.fitBounds(bounds, {
         paddingTopLeft: [padding, padding],
         paddingBottomRight: [padding, padding],
