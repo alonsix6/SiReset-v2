@@ -46,13 +46,27 @@ def verify_token(token: str) -> Optional[dict]:
                 token,
                 settings.SUPABASE_JWT_SECRET,
                 algorithms=["HS256"],
-                options={"verify_aud": False}  # Supabase no usa 'aud' de la misma forma
+                audience="authenticated",  # Supabase usa audience="authenticated"
             )
             # Si es token de Supabase, el user_id está en 'sub'
             if payload.get("sub"):
                 return payload
-        except JWTError:
+        except JWTError as e:
             pass  # Intentar con el siguiente método
+
+    # Si no hay JWT secret configurado, decodificar sin verificar (modo desarrollo)
+    if not settings.SUPABASE_JWT_SECRET:
+        try:
+            # Decodificar sin verificar firma en modo desarrollo
+            payload = jwt.decode(
+                token,
+                options={"verify_signature": False, "verify_aud": False, "verify_exp": False}
+            )
+            # Si tiene 'sub' y 'email', es probablemente un token válido de Supabase
+            if payload.get("sub") and payload.get("email"):
+                return payload
+        except JWTError:
+            pass
 
     # Si no funciona, intentar con nuestra propia SECRET_KEY
     try:

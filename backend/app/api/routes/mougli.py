@@ -10,7 +10,7 @@ from io import BytesIO
 import json
 
 from app.core.database import get_db
-from app.api.deps import require_module
+from app.api.deps import get_current_user
 from app.models.user import User
 from app.processors import mougli_processor as mougli
 
@@ -22,7 +22,7 @@ async def process_mougli(
     outview_files: Optional[List[UploadFile]] = File(None),
     factores_json: Optional[str] = Form(None),
     outview_factor: Optional[float] = Form(None),
-    current_user: User = Depends(require_module("Mougli")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -93,7 +93,7 @@ async def process_mougli(
 
 @router.get("/factores")
 async def get_factores(
-    current_user: User = Depends(require_module("Mougli"))
+    current_user: User = Depends(get_current_user)
 ):
     """
     Obtener factores de conversión actuales
@@ -110,7 +110,7 @@ async def get_factores(
 async def update_factores(
     monitor_factors: dict = None,
     outview_factor: float = None,
-    current_user: User = Depends(require_module("Mougli"))
+    current_user: User = Depends(get_current_user)
 ):
     """
     Actualizar factores de conversión (solo admins y programmers)
@@ -137,7 +137,7 @@ async def update_factores(
 async def preview_file(
     file: UploadFile = File(...),
     file_type: str = Form(...),  # "monitor" o "outview"
-    current_user: User = Depends(require_module("Mougli"))
+    current_user: User = Depends(get_current_user)
 ):
     """
     Vista previa de archivo sin procesamiento completo
