@@ -23,6 +23,9 @@ export default function TheBox() {
   const [colorOffline, setColorOffline] = useState('#00ffff')
   const [highlightedMedio, setHighlightedMedio] = useState('')
   const [highlightColor, setHighlightColor] = useState('#FF0080')
+  const [colorTexto, setColorTexto] = useState('#FFFFFF')
+  const [colorEjeX, setColorEjeX] = useState('#AAAAAA')
+  const [colorEjeY, setColorEjeY] = useState('#AAAAAA')
 
   // Medias para líneas de referencia
   const [meanCONS, setMeanCONS] = useState(null)
@@ -214,8 +217,8 @@ export default function TheBox() {
               console.warn(`Usando ATP por defecto para ${medio}: ${atp}`)
             }
 
-            // Fórmula correcta: 40% ATP + 60% Afinidad
-            const tamanoRaw = (0.4 * atp) + (0.6 * afinidad)
+            // Fórmula: 40% ATP*100 + 60% Afinidad
+            const tamanoRaw = (0.4 * atp * 100) + (0.6 * afinidad)
 
             medios.push({
               nombre: medio,
@@ -418,21 +421,68 @@ export default function TheBox() {
               onClear={handleClearFile}
             />
 
-            {/* Controles */}
-            <ChartControls
-              analysisType={analysisType}
-              onAnalysisTypeChange={setAnalysisType}
-              colorOnline={colorOnline}
-              colorOffline={colorOffline}
-              onColorOnlineChange={setColorOnline}
-              onColorOfflineChange={setColorOffline}
-              highlightedMedio={highlightedMedio}
-              onHighlightChange={setHighlightedMedio}
-              highlightColor={highlightColor}
-              onHighlightColorChange={setHighlightColor}
-              medios={filteredData}
-              disabled={mediosData.length === 0}
-            />
+            {/* Tipo de análisis */}
+            <div className="card-reset-shadow animate-fade-in-up">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-reset-neon text-lg">🎯</span>
+                <h3 className="text-lg font-display text-reset-white">
+                  Tipo de análisis
+                </h3>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => setAnalysisType('all')}
+                  disabled={mediosData.length === 0}
+                  className={`
+                    px-4 py-3 rounded-lg transition-all text-left
+                    ${analysisType === 'all'
+                      ? 'bg-reset-neon text-reset-black font-bold'
+                      : 'bg-reset-gray-dark text-reset-white hover:bg-reset-gray-medium border border-reset-gray-light/20'
+                    }
+                    ${mediosData.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">Completo</span>
+                    <span className="text-xs opacity-70">Online + ATL</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setAnalysisType('online')}
+                  disabled={mediosData.length === 0}
+                  className={`
+                    px-4 py-3 rounded-lg transition-all text-left
+                    ${analysisType === 'online'
+                      ? 'bg-reset-neon text-reset-black font-bold'
+                      : 'bg-reset-gray-dark text-reset-white hover:bg-reset-gray-medium border border-reset-gray-light/20'
+                    }
+                    ${mediosData.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">Solo Online</span>
+                    <span className="text-xs opacity-70">Medios digitales</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setAnalysisType('offline')}
+                  disabled={mediosData.length === 0}
+                  className={`
+                    px-4 py-3 rounded-lg transition-all text-left
+                    ${analysisType === 'offline'
+                      ? 'bg-reset-neon text-reset-black font-bold'
+                      : 'bg-reset-gray-dark text-reset-white hover:bg-reset-gray-medium border border-reset-gray-light/20'
+                    }
+                    ${mediosData.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">Solo ATL</span>
+                    <span className="text-xs opacity-70">Medios tradicionales</span>
+                  </div>
+                </button>
+              </div>
+            </div>
 
             {/* Selector de medios */}
             <MediaSelector
@@ -511,11 +561,40 @@ export default function TheBox() {
                   colorOffline={colorOffline}
                   highlightedMedio={highlightedMedio}
                   highlightColor={highlightColor}
+                  colorTexto={colorTexto}
+                  colorEjeX={colorEjeX}
+                  colorEjeY={colorEjeY}
                   meanCONS={meanCONS}
                   meanHC={meanHC}
                 />
               )}
             </div>
+
+            {/* Personalización de colores */}
+            {mediosData.length > 0 && (
+              <div className="mt-4">
+                <ChartControls
+                  analysisType={analysisType}
+                  onAnalysisTypeChange={setAnalysisType}
+                  colorOnline={colorOnline}
+                  colorOffline={colorOffline}
+                  onColorOnlineChange={setColorOnline}
+                  onColorOfflineChange={setColorOffline}
+                  highlightedMedio={highlightedMedio}
+                  onHighlightChange={setHighlightedMedio}
+                  highlightColor={highlightColor}
+                  onHighlightColorChange={setHighlightColor}
+                  colorTexto={colorTexto}
+                  onColorTextoChange={setColorTexto}
+                  colorEjeX={colorEjeX}
+                  onColorEjeXChange={setColorEjeX}
+                  colorEjeY={colorEjeY}
+                  onColorEjeYChange={setColorEjeY}
+                  medios={filteredData}
+                  disabled={false}
+                />
+              </div>
+            )}
 
             {/* Info adicional */}
             {mediosData.length > 0 && (
