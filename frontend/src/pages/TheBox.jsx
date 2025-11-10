@@ -496,18 +496,18 @@ export default function TheBox() {
               <button
                 onClick={handleExport}
                 disabled={exporting || filteredData.filter(m => m.visible).length === 0}
-                className="btn-primary w-full animate-fade-in-up"
+                className="btn-primary w-full animate-fade-in-up flex items-center justify-center gap-2"
                 style={{ animationDelay: '0.3s' }}
               >
                 {exporting ? (
                   <>
-                    <Loader className="animate-spin mr-2" size={18} />
-                    Exportando...
+                    <Loader className="animate-spin" size={18} />
+                    <span>Exportando...</span>
                   </>
                 ) : (
                   <>
-                    <Download className="mr-2" size={18} />
-                    Descargar PNG
+                    <Download size={18} />
+                    <span>Descargar PNG</span>
                   </>
                 )}
               </button>

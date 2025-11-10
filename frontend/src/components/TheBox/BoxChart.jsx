@@ -101,24 +101,34 @@ const BoxChart = forwardRef(({
     )
   }
 
-  // Custom legend
+  // Custom legend - solo muestra tipos de medios activos
   const renderLegend = () => {
+    const hasOnline = dataOnline.length > 0
+    const hasOffline = dataOffline.length > 0
+
+    // Si no hay medios visibles, no mostrar leyenda
+    if (!hasOnline && !hasOffline) return null
+
     return (
       <div className="flex justify-center gap-6 mt-4">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-8 h-1.5 rounded"
-            style={{ backgroundColor: colorOnline }}
-          />
-          <span className="text-reset-white text-sm font-semibold">Online</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div
-            className="w-8 h-1.5 rounded"
-            style={{ backgroundColor: colorOffline }}
-          />
-          <span className="text-reset-white text-sm font-semibold">Offline (ATL)</span>
-        </div>
+        {hasOnline && (
+          <div className="flex items-center gap-2">
+            <div
+              className="w-8 h-1.5 rounded"
+              style={{ backgroundColor: colorOnline }}
+            />
+            <span className="text-reset-white text-sm font-semibold">Online</span>
+          </div>
+        )}
+        {hasOffline && (
+          <div className="flex items-center gap-2">
+            <div
+              className="w-8 h-1.5 rounded"
+              style={{ backgroundColor: colorOffline }}
+            />
+            <span className="text-reset-white text-sm font-semibold">Offline (ATL)</span>
+          </div>
+        )}
       </div>
     )
   }

@@ -110,9 +110,9 @@ export default function FileUploader({ onFileUpload, fileName, onClear }) {
         </>
       ) : (
         <div className="flex items-center gap-3 p-4 bg-reset-gray-dark rounded-lg border border-reset-neon/30">
-          <FileSpreadsheet className="text-reset-neon" size={32} />
-          <div className="flex-1">
-            <p className="text-reset-white font-semibold text-sm truncate">
+          <FileSpreadsheet className="text-reset-neon flex-shrink-0" size={32} />
+          <div className="flex-1 min-w-0">
+            <p className="text-reset-white font-semibold text-sm truncate" title={fileName}>
               {fileName}
             </p>
             <span className="text-xs text-reset-cyan">
