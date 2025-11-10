@@ -7,6 +7,7 @@ export default function Layout({ user, onLogout, children }) {
     { name: 'Dashboard', path: '/', icon: '▶', module: null },
     { name: 'Mougli', path: '/mougli', icon: '▶', module: 'Mougli' },
     { name: 'Mapito', path: '/mapito', icon: '▶', module: 'Mapito' },
+    { name: 'The Box', path: '/thebox', icon: '▶', module: 'TheBox' },
     { name: 'Admin', path: '/admin', icon: '▶', adminOnly: true },
   ]
 
