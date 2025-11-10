@@ -71,9 +71,9 @@ const BoxChart = forwardRef(({
     return null
   }
 
-  // Custom label para cada punto - aparece sobre la burbuja
+  // Custom label para cada punto - centrado en la burbuja
   const renderCustomLabel = (props) => {
-    const { x, y, width, height, value, index } = props
+    const { cx, cy, value } = props
 
     // Obtener el punto de datos correspondiente
     const punto = [...dataOnline, ...dataOffline].find((d, i) => {
@@ -81,20 +81,23 @@ const BoxChart = forwardRef(({
       return d.nombre === value
     })
 
-    if (!punto) return null
+    if (!punto || !cx || !cy) return null
+
+    const isHighlighted = punto.nombre === highlightedMedio
 
     return (
       <text
-        x={x}
-        y={y}
-        fill={punto.nombre === highlightedMedio ? highlightColor : (colorTexto || '#FFFFFF')}
-        fontSize={punto.nombre === highlightedMedio ? 14 : 11}
-        fontWeight={punto.nombre === highlightedMedio ? 'bold' : '600'}
+        x={cx}
+        y={cy}
+        fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
+        fontSize={isHighlighted ? 13 : 10}
+        fontWeight={isHighlighted ? 'bold' : '600'}
         textAnchor="middle"
         dominantBaseline="middle"
         stroke="#000000"
-        strokeWidth={0.4}
+        strokeWidth={0.3}
         paintOrder="stroke"
+        style={{ pointerEvents: 'none' }}
       >
         {punto.nombre}
       </text>
@@ -162,7 +165,7 @@ const BoxChart = forwardRef(({
       {/* Gráfico */}
       <ResponsiveContainer width="100%" height={600}>
         <ScatterChart
-          margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
+          margin={{ top: 40, right: 40, bottom: 60, left: 60 }}
         >
           <CartesianGrid
             strokeDasharray="3 3"
@@ -209,7 +212,7 @@ const BoxChart = forwardRef(({
           <ZAxis
             type="number"
             dataKey="tamano"
-            range={[200, 1200]}
+            range={[600, 2500]}
             name="Tamaño"
           />
 
