@@ -26,7 +26,7 @@ function App() {
                 session.user.email,
           role: session.user.user_metadata?.role || 'user',
           active: true,
-          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito']
+          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox']
         }
         setUser(userData)
         localStorage.setItem('token', session.access_token)
@@ -48,7 +48,7 @@ function App() {
                 session.user.email,
           role: session.user.user_metadata?.role || 'user',
           active: true,
-          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito']
+          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox']
         }
         setUser(userData)
         localStorage.setItem('token', session.access_token)
