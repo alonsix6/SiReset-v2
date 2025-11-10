@@ -20,7 +20,7 @@ function App() {
     const interceptor = axios.interceptors.response.use(
       response => response,
       async error => {
-        // Manejar errores 401 (no autenticado/token expirado)
+        // Solo manejar errores 401 relacionados con autenticación
         if (error.response?.status === 401) {
           // Si la respuesta es un Blob, convertirlo a JSON primero
           if (error.response.data instanceof Blob) {
@@ -33,16 +33,25 @@ function App() {
             }
           }
 
-          // Limpiar autenticación y redirigir al login
-          console.warn('Sesión expirada o token inválido, redirigiendo al login...')
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          await supabase.auth.signOut()
-          setUser(null)
+          // Solo cerrar sesión si es un error de autenticación crítico
+          const errorDetail = error.response.data?.detail || ''
+          const isCriticalAuthError =
+            errorDetail.includes('credenciales') ||
+            errorDetail.includes('token') ||
+            errorDetail.includes('autenticación') ||
+            errorDetail.includes('authentication')
 
-          // Solo redirigir si no estamos ya en la página de login
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/auth/callback') {
-            window.location.href = '/login'
+          if (isCriticalAuthError) {
+            console.warn('Error de autenticación crítico detectado:', errorDetail)
+            localStorage.removeItem('token')
+            localStorage.removeItem('user')
+            await supabase.auth.signOut()
+            setUser(null)
+
+            // Solo redirigir si no estamos ya en la página de login
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/auth/callback') {
+              window.location.href = '/login'
+            }
           }
         }
 
