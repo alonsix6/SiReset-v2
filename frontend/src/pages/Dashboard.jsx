@@ -19,6 +19,15 @@ export default function Dashboard({ user }) {
       gradient: 'from-reset-neon to-green-400',
       borderColor: 'border-reset-neon',
       path: '/mapito'
+    },
+    {
+      code: 'TheBox',
+      title: 'THE BOX',
+      description: 'Generador de gráficos de afinidad y consumo de medios',
+      icon: '▶',
+      gradient: 'from-reset-magenta to-reset-purple',
+      borderColor: 'border-reset-magenta',
+      path: '/thebox'
     }
   ]
 
@@ -58,7 +67,7 @@ export default function Dashboard({ user }) {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
             {userModules.map((module, index) => (
               <Link
                 key={module.code}
