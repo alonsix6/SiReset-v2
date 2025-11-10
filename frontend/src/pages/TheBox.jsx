@@ -47,21 +47,21 @@ export default function TheBox() {
   const determinarTipoATP = (medio) => {
     const medioLower = medio.toLowerCase().trim()
 
-    // TV (abierta y paga)
+    // TV (abierta y paga) → "ATP TV general"
     if (medioLower.includes('tv paga') || medioLower.includes('tv abierta')) {
-      return 'TV'
+      return 'TV general'
     }
 
-    // Redes Sociales
+    // Redes Sociales → "ATP Internet Social Media"
     const redesSociales = [
       'facebook', 'instagram', 'tiktok', 'tik tok', 'whatsapp',
       'youtube', 'x', 'pinterest', 'linkedin', 'snapchat'
     ]
     if (redesSociales.some(red => medioLower.includes(red))) {
-      return 'RRSS'
+      return 'Internet Social Media'
     }
 
-    // Internet (resto de medios online que no son RRSS)
+    // Internet (resto de medios online que no son RRSS) → "ATP Internet"
     const mediosInternet = [
       'gmail', 'google', 'podcast', 'spotify', 'twitch',
       'diario online', 'radio online', 'tv online'
@@ -127,11 +127,14 @@ export default function TheBox() {
       const atpValues = {}
       jsonData.forEach((row) => {
         const cell = row[0]
-        if (typeof cell === 'string' && cell.startsWith('ATP ')) {
-          const tipoATP = cell.substring(4).trim().toUpperCase()
+        if (typeof cell === 'string' && cell.toUpperCase().startsWith('ATP ')) {
+          const tipoATP = cell.substring(4).trim()
           const valorATP = row[3]
           if (valorATP !== undefined && valorATP !== null && !isNaN(valorATP)) {
+            // Guardar con el nombre original y también normalizado
             atpValues[tipoATP] = Number(valorATP)
+            atpValues[tipoATP.toUpperCase()] = Number(valorATP)
+            atpValues[tipoATP.toLowerCase()] = Number(valorATP)
           }
         }
       })
@@ -177,15 +180,20 @@ export default function TheBox() {
 
             // Intentar leer ATP del Excel
             if (tipoATP) {
+              // Buscar variaciones del nombre (case-insensitive)
               const posiblesNombres = [
-                tipoATP.toUpperCase(),
-                tipoATP.toLowerCase(),
-                tipoATP
+                tipoATP,                          // "TV general", "Internet Social Media", "Internet"
+                tipoATP.toUpperCase(),            // "TV GENERAL", "INTERNET SOCIAL MEDIA", "INTERNET"
+                tipoATP.toLowerCase(),            // "tv general", "internet social media", "internet"
+                // También intentar con "ATP " prefijo por si acaso
+                `ATP ${tipoATP}`,
+                `atp ${tipoATP.toLowerCase()}`
               ]
 
               for (const nombre of posiblesNombres) {
                 if (atpValues[nombre] !== undefined) {
                   atp = atpValues[nombre]
+                  console.log(`✓ ATP encontrado para ${medio}: ${nombre} = ${atp}`)
                   break
                 }
               }
