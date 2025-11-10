@@ -47,21 +47,21 @@ export default function TheBox() {
   const determinarTipoATP = (medio) => {
     const medioLower = medio.toLowerCase().trim()
 
-    // TV (abierta y paga)
+    // TV (abierta y paga) → "ATP TV general"
     if (medioLower.includes('tv paga') || medioLower.includes('tv abierta')) {
-      return 'TV'
+      return 'TV general'
     }
 
-    // Redes Sociales
+    // Redes Sociales → "ATP Internet Social Media"
     const redesSociales = [
       'facebook', 'instagram', 'tiktok', 'tik tok', 'whatsapp',
       'youtube', 'x', 'pinterest', 'linkedin', 'snapchat'
     ]
     if (redesSociales.some(red => medioLower.includes(red))) {
-      return 'RRSS'
+      return 'Internet Social Media'
     }
 
-    // Internet (resto de medios online que no son RRSS)
+    // Internet (resto de medios online que no son RRSS) → "ATP Internet"
     const mediosInternet = [
       'gmail', 'google', 'podcast', 'spotify', 'twitch',
       'diario online', 'radio online', 'tv online'
@@ -127,11 +127,14 @@ export default function TheBox() {
       const atpValues = {}
       jsonData.forEach((row) => {
         const cell = row[0]
-        if (typeof cell === 'string' && cell.startsWith('ATP ')) {
-          const tipoATP = cell.substring(4).trim().toUpperCase()
+        if (typeof cell === 'string' && cell.toUpperCase().startsWith('ATP ')) {
+          const tipoATP = cell.substring(4).trim()
           const valorATP = row[3]
           if (valorATP !== undefined && valorATP !== null && !isNaN(valorATP)) {
+            // Guardar con el nombre original y también normalizado
             atpValues[tipoATP] = Number(valorATP)
+            atpValues[tipoATP.toUpperCase()] = Number(valorATP)
+            atpValues[tipoATP.toLowerCase()] = Number(valorATP)
           }
         }
       })
@@ -163,35 +166,54 @@ export default function TheBox() {
             }
           }
 
-          // Determinar qué tipo de ATP usar para este medio
-          const tipoATP = determinarTipoATP(medio)
-          let atp = null
-
-          // Buscar el ATP correspondiente (puede estar como "ATP TV", "ATP RRSS", etc.)
-          if (tipoATP) {
-            // Intentar diferentes variaciones del nombre
-            const posiblesNombres = [
-              tipoATP.toUpperCase(),
-              tipoATP.toLowerCase(),
-              tipoATP
-            ]
-
-            for (const nombre of posiblesNombres) {
-              if (atpValues[nombre] !== undefined) {
-                atp = atpValues[nombre]
-                break
-              }
-            }
-          }
-
-          // Validar que todos los datos existen
+          // Validar que HC, CONS y Afinidad existen
           if (
             hc !== undefined && hc !== null && !isNaN(hc) &&
             afinidad !== undefined && afinidad !== null && !isNaN(afinidad) &&
-            cons !== undefined && cons !== null && !isNaN(cons) &&
-            atp !== null && !isNaN(atp)
+            cons !== undefined && cons !== null && !isNaN(cons)
           ) {
             const tipo = clasificarMedio(medio)
+
+            // Determinar qué tipo de ATP usar para este medio
+            const tipoATP = determinarTipoATP(medio)
+            let atp = null
+
+            // Intentar leer ATP del Excel
+            if (tipoATP) {
+              // Buscar variaciones del nombre (case-insensitive)
+              const posiblesNombres = [
+                tipoATP,                          // "TV general", "Internet Social Media", "Internet"
+                tipoATP.toUpperCase(),            // "TV GENERAL", "INTERNET SOCIAL MEDIA", "INTERNET"
+                tipoATP.toLowerCase(),            // "tv general", "internet social media", "internet"
+                // También intentar con "ATP " prefijo por si acaso
+                `ATP ${tipoATP}`,
+                `atp ${tipoATP.toLowerCase()}`
+              ]
+
+              for (const nombre of posiblesNombres) {
+                if (atpValues[nombre] !== undefined) {
+                  atp = atpValues[nombre]
+                  console.log(`✓ ATP encontrado para ${medio}: ${nombre} = ${atp}`)
+                  break
+                }
+              }
+            }
+
+            // Si no encontró ATP en Excel, usar valores por defecto
+            if (atp === null) {
+              const medioLower = medio.toLowerCase()
+              if (medioLower.includes('tv paga') || medioLower.includes('tv abierta')) {
+                atp = 41.34
+              } else if (['facebook', 'instagram', 'tiktok', 'whatsapp', 'youtube', 'x', 'pinterest', 'linkedin', 'snapchat'].some(red => medioLower.includes(red))) {
+                atp = 39.45
+              } else if (tipo === 'online') {
+                atp = 17.74
+              } else {
+                atp = 27.35
+              }
+              console.warn(`Usando ATP por defecto para ${medio}: ${atp}`)
+            }
+
             // Fórmula correcta: 40% ATP + 60% Afinidad
             const tamanoRaw = (0.4 * atp) + (0.6 * afinidad)
 
@@ -202,13 +224,11 @@ export default function TheBox() {
               Afinidad: Number(afinidad),
               tipo: tipo,
               ATP: Number(atp),
-              tipoATP: tipoATP,
+              tipoATP: tipoATP || 'Por defecto',
               tamanoRaw: tamanoRaw,
               tamano: 0, // Se calculará después de normalizar
               visible: true
             })
-          } else {
-            console.warn(`Medio ${medio} no tiene todos los datos necesarios. ATP tipo: ${tipoATP}, valor: ${atp}`)
           }
         }
       })

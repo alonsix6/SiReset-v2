@@ -4,13 +4,15 @@ import {
   Scatter,
   XAxis,
   YAxis,
+  ZAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
   ReferenceLine,
   Cell,
-  Label
+  Label,
+  LabelList
 } from 'recharts'
 
 const BoxChart = forwardRef(({
@@ -67,25 +69,31 @@ const BoxChart = forwardRef(({
   }
 
   // Custom label para cada punto - aparece sobre la burbuja
-  const renderLabel = (props) => {
-    const { cx, cy, payload } = props
+  const renderCustomLabel = (props) => {
+    const { x, y, width, height, value, index } = props
 
-    if (!cx || !cy || !payload) return null
+    // Obtener el punto de datos correspondiente
+    const punto = [...dataOnline, ...dataOffline].find((d, i) => {
+      // value contiene el nombre del medio
+      return d.nombre === value
+    })
+
+    if (!punto) return null
 
     return (
       <text
-        x={cx}
-        y={cy}
-        fill={payload.nombre === highlightedMedio ? highlightColor : '#FFFFFF'}
-        fontSize={payload.nombre === highlightedMedio ? 16 : 13}
-        fontWeight={payload.nombre === highlightedMedio ? 'bold' : '600'}
+        x={x}
+        y={y}
+        fill={punto.nombre === highlightedMedio ? highlightColor : '#FFFFFF'}
+        fontSize={punto.nombre === highlightedMedio ? 14 : 11}
+        fontWeight={punto.nombre === highlightedMedio ? 'bold' : '600'}
         textAnchor="middle"
-        dominantBaseline="central"
+        dominantBaseline="middle"
         stroke="#000000"
-        strokeWidth={payload.nombre === highlightedMedio ? 0.5 : 0.3}
+        strokeWidth={0.4}
         paintOrder="stroke"
       >
-        {payload.nombre}
+        {punto.nombre}
       </text>
     )
   }
@@ -185,6 +193,13 @@ const BoxChart = forwardRef(({
             />
           </YAxis>
 
+          <ZAxis
+            type="number"
+            dataKey="tamano"
+            range={[200, 1200]}
+            name="Tamaño"
+          />
+
           <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
 
           {/* Líneas de media */}
@@ -213,7 +228,6 @@ const BoxChart = forwardRef(({
               name="Online"
               data={dataOnline}
               fill={colorOnline}
-              label={renderLabel}
             >
               {dataOnline.map((entry, index) => (
                 <Cell
@@ -224,6 +238,10 @@ const BoxChart = forwardRef(({
                   opacity={entry.nombre === highlightedMedio ? 1 : 0.7}
                 />
               ))}
+              <LabelList
+                dataKey="nombre"
+                content={renderCustomLabel}
+              />
             </Scatter>
           )}
 
@@ -233,7 +251,6 @@ const BoxChart = forwardRef(({
               name="Offline"
               data={dataOffline}
               fill={colorOffline}
-              label={renderLabel}
             >
               {dataOffline.map((entry, index) => (
                 <Cell
@@ -244,6 +261,10 @@ const BoxChart = forwardRef(({
                   opacity={entry.nombre === highlightedMedio ? 1 : 0.7}
                 />
               ))}
+              <LabelList
+                dataKey="nombre"
+                content={renderCustomLabel}
+              />
             </Scatter>
           )}
         </ScatterChart>
