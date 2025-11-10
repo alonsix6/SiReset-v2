@@ -22,6 +22,9 @@ const BoxChart = forwardRef(({
   colorOffline,
   highlightedMedio,
   highlightColor,
+  colorTexto,
+  colorEjeX,
+  colorEjeY,
   meanCONS,
   meanHC
 }, ref) => {
@@ -84,7 +87,7 @@ const BoxChart = forwardRef(({
       <text
         x={x}
         y={y}
-        fill={punto.nombre === highlightedMedio ? highlightColor : '#FFFFFF'}
+        fill={punto.nombre === highlightedMedio ? highlightColor : (colorTexto || '#FFFFFF')}
         fontSize={punto.nombre === highlightedMedio ? 14 : 11}
         fontWeight={punto.nombre === highlightedMedio ? 'bold' : '600'}
         textAnchor="middle"
@@ -163,14 +166,14 @@ const BoxChart = forwardRef(({
             domain={[0, 0.7]}
             ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]}
             tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
-            stroke="#AAAAAA"
-            tick={{ fill: '#AAAAAA', fontSize: 14 }}
+            stroke={colorEjeX || '#AAAAAA'}
+            tick={{ fill: colorEjeX || '#AAAAAA', fontSize: 14 }}
           >
             <Label
               value="Consumo (%)"
               position="bottom"
               offset={40}
-              style={{ fill: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}
+              style={{ fill: colorEjeX || '#AAAAAA', fontSize: 16, fontWeight: 'bold' }}
             />
           </XAxis>
 
@@ -181,15 +184,15 @@ const BoxChart = forwardRef(({
             domain={[0, 0.5]}
             ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5]}
             tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
-            stroke="#AAAAAA"
-            tick={{ fill: '#AAAAAA', fontSize: 14 }}
+            stroke={colorEjeY || '#AAAAAA'}
+            tick={{ fill: colorEjeY || '#AAAAAA', fontSize: 14 }}
           >
             <Label
               value="High Consumers (%)"
               angle={-90}
               position="left"
               offset={40}
-              style={{ fill: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}
+              style={{ fill: colorEjeY || '#AAAAAA', fontSize: 16, fontWeight: 'bold' }}
             />
           </YAxis>
 
