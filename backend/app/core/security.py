@@ -37,8 +37,24 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def verify_token(token: str) -> Optional[dict]:
     """
-    Verificar y decodificar JWT token
+    Verificar y decodificar JWT token (soporte para Supabase y tokens propios)
     """
+    # Primero intentar verificar como token de Supabase
+    if settings.SUPABASE_JWT_SECRET:
+        try:
+            payload = jwt.decode(
+                token,
+                settings.SUPABASE_JWT_SECRET,
+                algorithms=["HS256"],
+                options={"verify_aud": False}  # Supabase no usa 'aud' de la misma forma
+            )
+            # Si es token de Supabase, el user_id está en 'sub'
+            if payload.get("sub"):
+                return payload
+        except JWTError:
+            pass  # Intentar con el siguiente método
+
+    # Si no funciona, intentar con nuestra propia SECRET_KEY
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
