@@ -38,13 +38,31 @@ async def get_current_user(
     if payload is None:
         raise credentials_exception
 
-    user_id: int = payload.get("sub")
+    # Determinar si es token de Supabase (sub es UUID) o token propio (sub es int)
+    user_id = payload.get("sub")
     if user_id is None:
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise credentials_exception
+    # Si el token contiene 'email', es de Supabase - buscar por email
+    user_email = payload.get("email")
+    if user_email:
+        # Token de Supabase - buscar usuario por email
+        user = db.query(User).filter(User.email == user_email.lower().strip()).first()
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario no registrado en el sistema. Contacta al administrador."
+            )
+    else:
+        # Token propio - buscar por ID
+        try:
+            user_id_int = int(user_id)
+            user = db.query(User).filter(User.id == user_id_int).first()
+        except (ValueError, TypeError):
+            raise credentials_exception
+
+        if user is None:
+            raise credentials_exception
 
     if not user.active:
         raise HTTPException(

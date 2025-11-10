@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import axios from 'axios'
 import { supabase } from './lib/supabaseClient'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
@@ -13,6 +14,47 @@ import Layout from './components/Layout'
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  // Configurar interceptor de axios para manejar errores 401 globalmente
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      response => response,
+      async error => {
+        // Manejar errores 401 (no autenticado/token expirado)
+        if (error.response?.status === 401) {
+          // Si la respuesta es un Blob, convertirlo a JSON primero
+          if (error.response.data instanceof Blob) {
+            try {
+              const text = await error.response.data.text()
+              const errorData = JSON.parse(text)
+              error.response.data = errorData
+            } catch {
+              // Si no se puede parsear, continuar con el error original
+            }
+          }
+
+          // Limpiar autenticación y redirigir al login
+          console.warn('Sesión expirada o token inválido, redirigiendo al login...')
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          await supabase.auth.signOut()
+          setUser(null)
+
+          // Solo redirigir si no estamos ya en la página de login
+          if (window.location.pathname !== '/login' && window.location.pathname !== '/auth/callback') {
+            window.location.href = '/login'
+          }
+        }
+
+        return Promise.reject(error)
+      }
+    )
+
+    // Limpiar el interceptor cuando el componente se desmonte
+    return () => {
+      axios.interceptors.response.eject(interceptor)
+    }
+  }, [])
 
   useEffect(() => {
     // Verificar sesión actual de Supabase

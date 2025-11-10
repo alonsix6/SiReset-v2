@@ -15,6 +15,34 @@ export default function Mougli({ user }) {
       return
     }
 
+    // Verificar que existe el token
+    const token = localStorage.getItem('token')
+    if (!token) {
+      setMessage('No estás autenticado. Por favor, inicia sesión.')
+      setMessageType('error')
+      setTimeout(() => {
+        window.location.href = '/login'
+      }, 2000)
+      return
+    }
+
+    // Verificar si el token está expirado (decodificar JWT)
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        setMessage('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.')
+        setMessageType('error')
+        localStorage.removeItem('token')
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 2000)
+        return
+      }
+    } catch (tokenError) {
+      // Si no se puede decodificar, continuar y dejar que el backend lo valide
+      console.warn('No se pudo verificar la expiración del token:', tokenError)
+    }
+
     setProcessing(true)
     setMessage('Procesando archivos...')
     setMessageType('info')
@@ -29,8 +57,6 @@ export default function Mougli({ user }) {
       outviewFiles.forEach(file => {
         formData.append('outview_files', file)
       })
-
-      const token = localStorage.getItem('token')
 
       const response = await axios.post('/api/mougli/process', formData, {
         headers: {
@@ -54,8 +80,33 @@ export default function Mougli({ user }) {
       setMonitorFiles([])
       setOutviewFiles([])
     } catch (error) {
-      setMessage('Error: ' + (error.response?.data?.detail || error.message))
-      setMessageType('error')
+      // Si la respuesta es un Blob (caso de errores con responseType: 'blob')
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text()
+          const errorData = JSON.parse(text)
+
+          // Si es 401, el token expiró o es inválido
+          if (error.response.status === 401) {
+            setMessage('Sesión expirada. Por favor, inicia sesión nuevamente.')
+            setMessageType('error')
+            // Redirigir al login después de 2 segundos
+            setTimeout(() => {
+              localStorage.removeItem('token')
+              window.location.href = '/login'
+            }, 2000)
+          } else {
+            setMessage('Error: ' + (errorData.detail || 'Error al procesar archivos'))
+            setMessageType('error')
+          }
+        } catch {
+          setMessage('Error: ' + error.message)
+          setMessageType('error')
+        }
+      } else {
+        setMessage('Error: ' + (error.response?.data?.detail || error.message))
+        setMessageType('error')
+      }
     } finally {
       setProcessing(false)
     }
