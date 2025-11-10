@@ -73,22 +73,37 @@ const BoxChart = forwardRef(({
 
   // Custom label para cada punto - centrado en la burbuja
   const renderCustomLabel = (props) => {
-    const { cx, cy, value } = props
+    // LabelList pasa diferentes props según el tipo de chart
+    // Para Scatter, tenemos x, y, index, value, etc.
+    const { x, y, index, value, cx, cy, payload } = props
 
-    // Obtener el punto de datos correspondiente
-    const punto = [...dataOnline, ...dataOffline].find((d, i) => {
-      // value contiene el nombre del medio
-      return d.nombre === value
-    })
+    // Usar cx, cy si están disponibles (coordenadas del centro), sino x, y
+    const centerX = cx !== undefined ? cx : x
+    const centerY = cy !== undefined ? cy : y
 
-    if (!punto || !cx || !cy) return null
+    // Si no hay coordenadas, no renderizar
+    if (centerX === undefined || centerY === undefined) {
+      console.log('No coordinates available:', props)
+      return null
+    }
+
+    // Obtener el punto de datos - puede venir en payload o buscar por value
+    let punto = payload
+    if (!punto) {
+      punto = [...dataOnline, ...dataOffline].find((d) => d.nombre === value)
+    }
+
+    if (!punto) {
+      console.log('No punto found for:', value)
+      return null
+    }
 
     const isHighlighted = punto.nombre === highlightedMedio
 
     return (
       <text
-        x={cx}
-        y={cy}
+        x={centerX}
+        y={centerY}
         fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
         fontSize={isHighlighted ? 13 : 10}
         fontWeight={isHighlighted ? 'bold' : '600'}
