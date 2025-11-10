@@ -6,6 +6,7 @@ import AuthCallback from './pages/AuthCallback'
 import Dashboard from './pages/Dashboard'
 import Mougli from './pages/Mougli'
 import Mapito from './pages/Mapito'
+import TheBox from './pages/TheBox'
 import Admin from './pages/Admin'
 import Layout from './components/Layout'
 
@@ -114,6 +115,11 @@ function App() {
       <Route path="/mapito" element={
         <Layout user={user} onLogout={handleLogout}>
           <Mapito user={user} />
+        </Layout>
+      } />
+      <Route path="/thebox" element={
+        <Layout user={user} onLogout={handleLogout}>
+          <TheBox user={user} />
         </Layout>
       } />
       <Route path="/admin" element={
