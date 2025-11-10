@@ -52,8 +52,12 @@ const BoxChart = forwardRef(({
               <span className="font-semibold">{data.Afinidad.toFixed(1)}</span>
             </p>
             <p className="text-reset-gray-light">
-              <span>ATP:</span>{' '}
-              <span className="font-semibold">{(data.ATP * 100).toFixed(2)}%</span>
+              <span>ATP ({data.tipoATP || 'N/A'}):</span>{' '}
+              <span className="font-semibold">{data.ATP.toFixed(2)}</span>
+            </p>
+            <p className="text-reset-cyan">
+              <span className="text-reset-gray-light">Tamaño burbuja:</span>{' '}
+              <span className="font-semibold">{data.tamanoRaw.toFixed(2)}</span>
             </p>
           </div>
         </div>
@@ -62,17 +66,24 @@ const BoxChart = forwardRef(({
     return null
   }
 
-  // Custom label para cada punto
+  // Custom label para cada punto - aparece sobre la burbuja
   const renderLabel = (props) => {
-    const { x, y, payload } = props
+    const { cx, cy, payload } = props
+
+    if (!cx || !cy || !payload) return null
+
     return (
       <text
-        x={x}
-        y={y - 10}
+        x={cx}
+        y={cy}
         fill={payload.nombre === highlightedMedio ? highlightColor : '#FFFFFF'}
-        fontSize={payload.nombre === highlightedMedio ? 14 : 12}
-        fontWeight={payload.nombre === highlightedMedio ? 'bold' : 'normal'}
+        fontSize={payload.nombre === highlightedMedio ? 16 : 13}
+        fontWeight={payload.nombre === highlightedMedio ? 'bold' : '600'}
         textAnchor="middle"
+        dominantBaseline="central"
+        stroke="#000000"
+        strokeWidth={payload.nombre === highlightedMedio ? 0.5 : 0.3}
+        paintOrder="stroke"
       >
         {payload.nombre}
       </text>
@@ -202,6 +213,7 @@ const BoxChart = forwardRef(({
               name="Online"
               data={dataOnline}
               fill={colorOnline}
+              label={renderLabel}
             >
               {dataOnline.map((entry, index) => (
                 <Cell
@@ -221,6 +233,7 @@ const BoxChart = forwardRef(({
               name="Offline"
               data={dataOffline}
               fill={colorOffline}
+              label={renderLabel}
             >
               {dataOffline.map((entry, index) => (
                 <Cell
@@ -238,32 +251,6 @@ const BoxChart = forwardRef(({
 
       {/* Leyenda personalizada */}
       {renderLegend()}
-
-      {/* Labels de medios */}
-      <div className="mt-6">
-        <ResponsiveContainer width="100%" height={60}>
-          <ScatterChart
-            margin={{ top: 0, right: 20, bottom: 0, left: 60 }}
-          >
-            <XAxis
-              type="number"
-              dataKey="CONS"
-              domain={[0, 0.7]}
-              hide
-            />
-            <YAxis
-              type="number"
-              dataKey="HC"
-              domain={[0, 0.5]}
-              hide
-            />
-            <Scatter
-              data={data.filter(d => d.visible)}
-              shape={renderLabel}
-            />
-          </ScatterChart>
-        </ResponsiveContainer>
-      </div>
     </div>
   )
 })

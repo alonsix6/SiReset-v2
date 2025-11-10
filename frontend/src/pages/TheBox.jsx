@@ -44,25 +44,48 @@ export default function TheBox() {
     return mediosOnline.some(m => medioLower.includes(m)) ? 'online' : 'offline'
   }
 
-  const calcularATP = (medio, tipo) => {
-    const medioLower = medio.toLowerCase()
+  const determinarTipoATP = (medio) => {
+    const medioLower = medio.toLowerCase().trim()
 
-    // TV tiene ATP específico
+    // TV (abierta y paga)
     if (medioLower.includes('tv paga') || medioLower.includes('tv abierta')) {
-      return 0.4134
+      return 'TV'
     }
 
-    // Redes sociales
+    // Redes Sociales
     const redesSociales = [
-      'facebook', 'instagram', 'tiktok', 'whatsapp', 'youtube',
-      'x', 'pinterest', 'linkedin', 'snapchat'
+      'facebook', 'instagram', 'tiktok', 'tik tok', 'whatsapp',
+      'youtube', 'x', 'pinterest', 'linkedin', 'snapchat'
     ]
     if (redesSociales.some(red => medioLower.includes(red))) {
-      return 0.3945
+      return 'RRSS'
     }
 
-    // Por tipo
-    return tipo === 'online' ? 0.1774 : 0.2735
+    // Internet (resto de medios online que no son RRSS)
+    const mediosInternet = [
+      'gmail', 'google', 'podcast', 'spotify', 'twitch',
+      'diario online', 'radio online', 'tv online'
+    ]
+    if (mediosInternet.some(m => medioLower.includes(m))) {
+      return 'Internet'
+    }
+
+    // Medios tradicionales offline
+    if (medioLower.includes('radio') && !medioLower.includes('online')) {
+      return 'Radio'
+    }
+    if (medioLower.includes('ooh')) {
+      return 'OOH'
+    }
+    if (medioLower.includes('cine')) {
+      return 'Cine'
+    }
+    if (medioLower.includes('diario') && !medioLower.includes('online')) {
+      return 'Diario'
+    }
+
+    // Por defecto
+    return null
   }
 
   const normalizarTamanos = (medios) => {
@@ -100,6 +123,21 @@ export default function TheBox() {
       const target = jsonData[4]?.[3] || 'Target no especificado'
       setTargetName(String(target).trim())
 
+      // Primero, buscar y guardar todos los valores de ATP disponibles
+      const atpValues = {}
+      jsonData.forEach((row) => {
+        const cell = row[0]
+        if (typeof cell === 'string' && cell.startsWith('ATP ')) {
+          const tipoATP = cell.substring(4).trim().toUpperCase()
+          const valorATP = row[3]
+          if (valorATP !== undefined && valorATP !== null && !isNaN(valorATP)) {
+            atpValues[tipoATP] = Number(valorATP)
+          }
+        }
+      })
+
+      console.log('ATP Values encontrados:', atpValues)
+
       const medios = []
 
       // Buscar filas que empiecen con "HC "
@@ -125,15 +163,37 @@ export default function TheBox() {
             }
           }
 
+          // Determinar qué tipo de ATP usar para este medio
+          const tipoATP = determinarTipoATP(medio)
+          let atp = null
+
+          // Buscar el ATP correspondiente (puede estar como "ATP TV", "ATP RRSS", etc.)
+          if (tipoATP) {
+            // Intentar diferentes variaciones del nombre
+            const posiblesNombres = [
+              tipoATP.toUpperCase(),
+              tipoATP.toLowerCase(),
+              tipoATP
+            ]
+
+            for (const nombre of posiblesNombres) {
+              if (atpValues[nombre] !== undefined) {
+                atp = atpValues[nombre]
+                break
+              }
+            }
+          }
+
           // Validar que todos los datos existen
           if (
             hc !== undefined && hc !== null && !isNaN(hc) &&
             afinidad !== undefined && afinidad !== null && !isNaN(afinidad) &&
-            cons !== undefined && cons !== null && !isNaN(cons)
+            cons !== undefined && cons !== null && !isNaN(cons) &&
+            atp !== null && !isNaN(atp)
           ) {
             const tipo = clasificarMedio(medio)
-            const atp = calcularATP(medio, tipo)
-            const tamanoRaw = (0.4 * atp * 100) + (0.6 * afinidad)
+            // Fórmula correcta: 40% ATP + 60% Afinidad
+            const tamanoRaw = (0.4 * atp) + (0.6 * afinidad)
 
             medios.push({
               nombre: medio,
@@ -141,11 +201,14 @@ export default function TheBox() {
               CONS: Number(cons),
               Afinidad: Number(afinidad),
               tipo: tipo,
-              ATP: atp,
+              ATP: Number(atp),
+              tipoATP: tipoATP,
               tamanoRaw: tamanoRaw,
               tamano: 0, // Se calculará después de normalizar
               visible: true
             })
+          } else {
+            console.warn(`Medio ${medio} no tiene todos los datos necesarios. ATP tipo: ${tipoATP}, valor: ${atp}`)
           }
         }
       })
