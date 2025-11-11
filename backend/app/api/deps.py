@@ -83,7 +83,7 @@ async def get_current_active_user(
 def require_module(module_code: str):
     """
     Dependency factory para requerir acceso a módulo específico
-    Usage: Depends(require_module("Mougli"))
+    Usage: Depends(require_module("Mapito"))
     """
     async def _require_module(current_user: User = Depends(get_current_user)):
         if not current_user.has_module(module_code):

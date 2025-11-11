@@ -138,7 +138,7 @@ async def register(
         role=user_data.role,
         pw_hash=hashed_password,
         active=True,
-        modules=["Mougli", "Mapito"]  # Módulos por defecto
+        modules=["Mapito"]  # Módulos por defecto
     )
 
     db.add(new_user)
