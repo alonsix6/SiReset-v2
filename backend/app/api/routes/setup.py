@@ -105,7 +105,7 @@ async def make_admin(
                 **current_metadata,
                 'role': 'admin',
                 'name': request.name or current_metadata.get('name') or request.email,
-                'modules': ['Mapito']
+                'modules': ['Mougli', 'Mapito']
             }
 
             update_response = await client.put(

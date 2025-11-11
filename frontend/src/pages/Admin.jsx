@@ -267,7 +267,7 @@ function UserRow({ user, onUpdateRole, onUpdateModules }) {
     user.user_metadata?.modules || []
   )
 
-  const availableModules = ['Mapito']
+  const availableModules = ['Mougli', 'Mapito']
   const currentRole = user.user_metadata?.role || 'user'
 
   const toggleModule = (module) => {

@@ -16,7 +16,7 @@ class User(Base):
     role = Column(String, nullable=False, default="user")  # admin, programmer, user
     pw_hash = Column(String, nullable=False)
     active = Column(Boolean, nullable=False, default=True)
-    modules = Column(JSON, nullable=False, default=list)  # ['Mapito']
+    modules = Column(JSON, nullable=False, default=list)  # ['Mougli', 'Mapito']
 
     def has_module(self, module_code: str) -> bool:
         """Verificar si usuario tiene acceso a módulo"""
@@ -38,7 +38,7 @@ class User(Base):
 class Module(Base):
     __tablename__ = "modules"
 
-    code = Column(String, primary_key=True)  # 'Mapito'
+    code = Column(String, primary_key=True)  # 'Mougli', 'Mapito'
     title = Column(String, nullable=False)
     description = Column(String)
     enabled = Column(Boolean, nullable=False, default=True)

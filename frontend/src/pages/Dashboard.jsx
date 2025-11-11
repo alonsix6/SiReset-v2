@@ -3,6 +3,15 @@ import { Link } from 'react-router-dom'
 export default function Dashboard({ user }) {
   const modules = [
     {
+      code: 'Mougli',
+      title: 'MOUGLI',
+      description: 'Procesamiento de datos Monitor & OutView',
+      icon: '▶',
+      gradient: 'from-reset-blue to-reset-cyan',
+      borderColor: 'border-reset-cyan',
+      path: '/mougli'
+    },
+    {
       code: 'Mapito',
       title: 'MAPITO',
       description: 'Mapas interactivos de Perú',

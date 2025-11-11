@@ -5,6 +5,7 @@ import { supabase } from './lib/supabaseClient'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
 import Dashboard from './pages/Dashboard'
+import Mougli from './pages/Mougli'
 import Mapito from './pages/Mapito'
 import TheBox from './pages/TheBox'
 import Admin from './pages/Admin'
@@ -76,7 +77,7 @@ function App() {
                 session.user.email,
           role: session.user.user_metadata?.role || 'user',
           active: true,
-          modules: session.user.user_metadata?.modules || ['Mapito', 'TheBox']
+          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox']
         }
         setUser(userData)
         localStorage.setItem('token', session.access_token)
@@ -98,7 +99,7 @@ function App() {
                 session.user.email,
           role: session.user.user_metadata?.role || 'user',
           active: true,
-          modules: session.user.user_metadata?.modules || ['Mapito', 'TheBox']
+          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox']
         }
         setUser(userData)
         localStorage.setItem('token', session.access_token)
@@ -155,6 +156,11 @@ function App() {
       <Route path="/" element={
         <Layout user={user} onLogout={handleLogout}>
           <Dashboard user={user} />
+        </Layout>
+      } />
+      <Route path="/mougli" element={
+        <Layout user={user} onLogout={handleLogout}>
+          <Mougli user={user} />
         </Layout>
       } />
       <Route path="/mapito" element={
