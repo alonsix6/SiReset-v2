@@ -125,17 +125,27 @@ const BoxChart = forwardRef(({
   }
 
   // Componente para renderizar labels de burbujas directamente en el centro
-  const BubbleLabels = ({ xScale, yScale }) => {
-    if (!xScale || !yScale) return null
+  const BubbleLabels = (props) => {
+    const { xScale, yScale, xAxisMap, yAxisMap } = props
+
+    // Obtener las escalas correctas
+    const xScaleFunc = xScale || (xAxisMap && xAxisMap[0]?.scale)
+    const yScaleFunc = yScale || (yAxisMap && yAxisMap[0]?.scale)
+
+    if (!xScaleFunc || !yScaleFunc) {
+      console.log('BubbleLabels: No scales available', { xScale, yScale, xAxisMap, yAxisMap })
+      return null
+    }
 
     const allData = [...dataOnline, ...dataOffline]
+    console.log('BubbleLabels rendering', allData.length, 'labels')
 
     return (
       <g className="bubble-labels">
         {allData.map((punto, index) => {
           // Convertir coordenadas de datos a píxeles
-          const centerX = xScale(punto.CONS)
-          const centerY = yScale(punto.HC)
+          const centerX = xScaleFunc(punto.CONS)
+          const centerY = yScaleFunc(punto.HC)
 
           const isHighlighted = punto.nombre === highlightedMedio
           const fontSize = isHighlighted ? 13 : 10
@@ -165,11 +175,19 @@ const BoxChart = forwardRef(({
   }
 
   // Componente para renderizar marcadores triangulares cuando burbujas se solapan
-  const OverlapMarkers = ({ xScale, yScale }) => {
-    if (!xScale || !yScale || connectorLines.length === 0) return null
+  const OverlapMarkers = (props) => {
+    const { xScale, yScale, xAxisMap, yAxisMap } = props
+
+    // Obtener las escalas correctas
+    const xScaleFunc = xScale || (xAxisMap && xAxisMap[0]?.scale)
+    const yScaleFunc = yScale || (yAxisMap && yAxisMap[0]?.scale)
+
+    if (!xScaleFunc || !yScaleFunc || connectorLines.length === 0) return null
 
     const markers = []
     const allData = [...dataOnline, ...dataOffline]
+
+    console.log('OverlapMarkers rendering', connectorLines.length, 'overlaps')
 
     connectorLines.forEach((overlap, index) => {
       const bubble1 = overlap.bubble1
@@ -178,10 +196,10 @@ const BoxChart = forwardRef(({
       if (!bubble1 || !bubble2) return
 
       // Convertir coordenadas de datos a píxeles
-      const x1 = xScale(bubble1.CONS)
-      const y1 = yScale(bubble1.HC)
-      const x2 = xScale(bubble2.CONS)
-      const y2 = yScale(bubble2.HC)
+      const x1 = xScaleFunc(bubble1.CONS)
+      const y1 = yScaleFunc(bubble1.HC)
+      const x2 = xScaleFunc(bubble2.CONS)
+      const y2 = yScaleFunc(bubble2.HC)
 
       // Calcular ángulo entre las burbujas
       const dx = x2 - x1
