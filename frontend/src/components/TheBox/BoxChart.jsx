@@ -153,8 +153,8 @@ const BoxChart = forwardRef(({
     const isHighlighted = punto.nombre === highlightedMedio
 
     // Ajustar posición para que se vea visualmente centrado
-    const adjustedX = centerX + 25
-    const adjustedY = centerY + 25
+    const adjustedX = centerX + 35
+    const adjustedY = centerY + 35
 
     return (
       <text
