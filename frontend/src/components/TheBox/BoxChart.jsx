@@ -36,6 +36,11 @@ const BoxChart = forwardRef(({
   // Estado para almacenar overlaps detectados
   const [connectorLines, setConnectorLines] = useState([])
 
+  // Estado para posiciones manuales de labels
+  const [manualPositions, setManualPositions] = useState({})
+  const [draggingLabel, setDraggingLabel] = useState(null)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+
   // Detectar burbujas que se solapan y necesitan indicadores
   const detectOverlappingBubbles = () => {
     const allData = [...dataOnline, ...dataOffline]
@@ -134,6 +139,15 @@ const BoxChart = forwardRef(({
 
   // Calcular posición desplazada para label cuando hay overlap - buscar espacio libre
   const getDisplacedPosition = (punto, centerX, centerY) => {
+    // Si hay una posición manual guardada, usarla
+    if (manualPositions[punto.nombre]) {
+      return {
+        x: manualPositions[punto.nombre].x,
+        y: manualPositions[punto.nombre].y,
+        hasDisplacement: true
+      }
+    }
+
     // Buscar si esta burbuja tiene overlaps
     const overlap = connectorLines.find(
       o => o.nombre1 === punto.nombre || o.nombre2 === punto.nombre
@@ -181,6 +195,49 @@ const BoxChart = forwardRef(({
     }
   }
 
+  // Handlers para drag & drop de labels
+  const handleLabelMouseDown = (e, punto, centerX, centerY, currentX, currentY) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    // Obtener coordenadas del SVG
+    const svgElement = e.currentTarget.ownerSVGElement
+    const rect = svgElement.getBoundingClientRect()
+
+    setDraggingLabel(punto.nombre)
+    setDragOffset({
+      x: e.clientX - rect.left - currentX,
+      y: e.clientY - rect.top - currentY,
+      centerX: centerX,
+      centerY: centerY
+    })
+  }
+
+  const handleMouseMove = (e) => {
+    if (!draggingLabel) return
+
+    // Obtener el SVG element correctamente
+    const svgElement = e.currentTarget.querySelector('svg') || e.currentTarget
+    const rect = svgElement.getBoundingClientRect()
+
+    // Calcular posición del mouse relativa al SVG
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+
+    // Calcular offset desde el centro de la burbuja
+    const offsetX = mouseX - dragOffset.x - dragOffset.centerX
+    const offsetY = mouseY - dragOffset.y - dragOffset.centerY
+
+    setManualPositions(prev => ({
+      ...prev,
+      [draggingLabel]: { x: offsetX, y: offsetY }
+    }))
+  }
+
+  const handleMouseUp = () => {
+    setDraggingLabel(null)
+  }
+
   // Custom label para cada punto - centrado en la burbuja
   const renderCustomLabel = (props) => {
     // LabelList pasa diferentes props según el tipo de chart
@@ -216,6 +273,8 @@ const BoxChart = forwardRef(({
     // Color de la burbuja para la línea conectora
     const bubbleColor = punto.tipo === 'online' ? colorOnline : colorOffline
 
+    const isDragging = draggingLabel === punto.nombre
+
     return (
       <g>
         {/* Línea conectora si el texto está desplazado por overlap */}
@@ -244,7 +303,12 @@ const BoxChart = forwardRef(({
           stroke="#000000"
           strokeWidth={0.3}
           paintOrder="stroke"
-          style={{ pointerEvents: 'none' }}
+          style={{
+            cursor: 'move',
+            opacity: isDragging ? 0.5 : 1,
+            userSelect: 'none'
+          }}
+          onMouseDown={(e) => handleLabelMouseDown(e, punto, centerX, centerY, adjustedX, adjustedY)}
         >
           {punto.nombre}
         </text>
@@ -402,12 +466,23 @@ const BoxChart = forwardRef(({
             {targetName}
           </p>
         )}
+        {Object.keys(manualPositions).length > 0 && (
+          <button
+            onClick={() => setManualPositions({})}
+            className="mt-3 px-4 py-2 bg-reset-magenta/20 hover:bg-reset-magenta/30 text-reset-magenta border border-reset-magenta rounded-lg text-sm font-semibold transition-colors"
+          >
+            Resetear posiciones de textos
+          </button>
+        )}
       </div>
 
       {/* Gráfico */}
       <ResponsiveContainer width="100%" height={600}>
         <ScatterChart
           margin={{ top: 40, right: 40, bottom: 60, left: 60 }}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
         >
           <CartesianGrid
             strokeDasharray="3 3"
