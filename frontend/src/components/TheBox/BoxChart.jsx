@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useState, useEffect, useRef } from 'react'
 import {
   ScatterChart,
   Scatter,
@@ -12,7 +12,8 @@ import {
   ReferenceLine,
   Cell,
   Label,
-  LabelList
+  LabelList,
+  Customized
 } from 'recharts'
 
 const BoxChart = forwardRef(({
@@ -31,6 +32,77 @@ const BoxChart = forwardRef(({
   // Separar datos por tipo
   const dataOnline = data.filter(d => d.tipo === 'online' && d.visible)
   const dataOffline = data.filter(d => d.tipo === 'offline' && d.visible)
+
+  // Estado para almacenar posiciones de labels y líneas conectoras
+  const [labelPositions, setLabelPositions] = useState({})
+  const [connectorLines, setConnectorLines] = useState([])
+  const chartRef = useRef(null)
+
+  // Función para calcular el ancho aproximado del texto
+  const getTextWidth = (text, fontSize) => {
+    // Aproximación: cada caracter ocupa ~0.6 * fontSize en ancho
+    return text.length * fontSize * 0.6
+  }
+
+  // Función para detectar si dos rectángulos se solapan
+  const checkOverlap = (rect1, rect2, padding = 5) => {
+    return !(
+      rect1.right + padding < rect2.left ||
+      rect1.left - padding > rect2.right ||
+      rect1.bottom + padding < rect2.top ||
+      rect1.top - padding > rect2.bottom
+    )
+  }
+
+  // Detectar burbujas que se solapan y necesitan indicadores
+  const detectOverlappingBubbles = () => {
+    const allData = [...dataOnline, ...dataOffline]
+    if (allData.length === 0) {
+      setConnectorLines([])
+      return
+    }
+
+    const overlaps = []
+
+    // Revisar todas las parejas de burbujas
+    for (let i = 0; i < allData.length; i++) {
+      for (let j = i + 1; j < allData.length; j++) {
+        const bubble1 = allData[i]
+        const bubble2 = allData[j]
+
+        // Calcular distancia entre centros
+        const dx = bubble2.CONS - bubble1.CONS
+        const dy = bubble2.HC - bubble1.HC
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        // Estimar radios de las burbujas (aproximación basada en ZAxis range)
+        // range es [1500, 5000], el radio visual es proporcional a sqrt(tamano)
+        const radius1 = Math.sqrt(bubble1.tamano / 5000) * 0.08 // Factor ajustado para el dominio
+        const radius2 = Math.sqrt(bubble2.tamano / 5000) * 0.08
+
+        // Si las burbujas se solapan o están muy cerca
+        if (distance < (radius1 + radius2) * 1.2) {
+          overlaps.push({
+            nombre1: bubble1.nombre,
+            nombre2: bubble2.nombre,
+            CONS1: bubble1.CONS,
+            HC1: bubble1.HC,
+            CONS2: bubble2.CONS,
+            HC2: bubble2.HC
+          })
+        }
+      }
+    }
+
+    // Por ahora, solo marcamos las burbujas que tienen overlaps
+    // No creamos líneas conectoras aún (implementación simplificada)
+    setConnectorLines(overlaps)
+  }
+
+  // Efecto para detectar overlaps cuando cambien los datos
+  useEffect(() => {
+    detectOverlappingBubbles()
+  }, [data, dataOnline.length, dataOffline.length, highlightedMedio])
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload }) => {
@@ -71,52 +143,155 @@ const BoxChart = forwardRef(({
     return null
   }
 
-  // Custom label para cada punto - centrado en la burbuja
+  // Verificar si una burbuja tiene overlaps
+  const hasOverlap = (nombreMedio) => {
+    return connectorLines.some(
+      overlap => overlap.nombre1 === nombreMedio || overlap.nombre2 === nombreMedio
+    )
+  }
+
+  // Custom label para cada punto - con mejor legibilidad
   const renderCustomLabel = (props) => {
-    // LabelList pasa diferentes props según el tipo de chart
-    // Para Scatter, tenemos x, y, index, value, etc.
-    const { x, y, index, value, cx, cy, payload } = props
+    const { x, y, value, cx, cy, payload } = props
 
     // Usar cx, cy si están disponibles (coordenadas del centro), sino x, y
-    const centerX = cx !== undefined ? cx : x
-    const centerY = cy !== undefined ? cy : y
+    let centerX = cx !== undefined ? cx : x
+    let centerY = cy !== undefined ? cy : y
 
     // Si no hay coordenadas, no renderizar
     if (centerX === undefined || centerY === undefined) {
-      console.log('No coordinates available:', props)
       return null
     }
 
-    // Obtener el punto de datos - puede venir en payload o buscar por value
+    // Obtener el punto de datos
     let punto = payload
     if (!punto) {
       punto = [...dataOnline, ...dataOffline].find((d) => d.nombre === value)
     }
 
     if (!punto) {
-      console.log('No punto found for:', value)
       return null
     }
 
     const isHighlighted = punto.nombre === highlightedMedio
+    const hasOverlapping = hasOverlap(punto.nombre)
+
+    // Si hay overlap, usar un fondo más visible y stroke más grueso
+    const fontSize = isHighlighted ? 13 : 10
+    const strokeWidth = hasOverlapping ? 0.8 : 0.3
 
     return (
-      <text
-        x={centerX}
-        y={centerY}
-        fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
-        fontSize={isHighlighted ? 13 : 10}
-        fontWeight={isHighlighted ? 'bold' : '600'}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        stroke="#000000"
-        strokeWidth={0.3}
-        paintOrder="stroke"
-        style={{ pointerEvents: 'none' }}
-      >
-        {punto.nombre}
-      </text>
+      <g>
+        {/* Fondo blanco semi-transparente para mejor legibilidad cuando hay overlap */}
+        {hasOverlapping && (
+          <rect
+            x={centerX - (punto.nombre.length * fontSize * 0.3)}
+            y={centerY - fontSize * 0.6}
+            width={punto.nombre.length * fontSize * 0.6}
+            height={fontSize * 1.2}
+            fill="rgba(0, 0, 0, 0.7)"
+            rx={3}
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
+
+        <text
+          x={centerX}
+          y={centerY}
+          fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
+          fontSize={fontSize}
+          fontWeight={isHighlighted ? 'bold' : '600'}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          stroke="#000000"
+          strokeWidth={strokeWidth}
+          paintOrder="stroke"
+          style={{ pointerEvents: 'none' }}
+        >
+          {punto.nombre}
+        </text>
+      </g>
     )
+  }
+
+  // Renderizar marcadores triangulares para burbujas que se solapan
+  const renderOverlapMarkers = () => {
+    if (connectorLines.length === 0) return null
+
+    const markers = []
+    const processedBubbles = new Set()
+
+    connectorLines.forEach((overlap, index) => {
+      // Obtener datos de ambas burbujas
+      const bubble1 = [...dataOnline, ...dataOffline].find(m => m.nombre === overlap.nombre1)
+      const bubble2 = [...dataOnline, ...dataOffline].find(m => m.nombre === overlap.nombre2)
+
+      if (!bubble1 || !bubble2) return
+
+      // Calcular ángulo entre las burbujas
+      const dx = bubble2.CONS - bubble1.CONS
+      const dy = bubble2.HC - bubble1.HC
+      const angle = Math.atan2(dy, dx)
+
+      // Colores de las burbujas
+      const color1 = bubble1.tipo === 'online' ? colorOnline : colorOffline
+      const color2 = bubble2.tipo === 'online' ? colorOnline : colorOffline
+
+      // Radio aproximado de las burbujas (en coordenadas de datos)
+      const radius1 = Math.sqrt(bubble1.tamano / 5000) * 0.06
+      const radius2 = Math.sqrt(bubble2.tamano / 5000) * 0.06
+
+      // Solo agregar marcador si no lo hemos procesado
+      if (!processedBubbles.has(bubble1.nombre)) {
+        // Posición del marcador en el borde de la burbuja 1 (opuesto a burbuja 2)
+        const markerAngle = angle + Math.PI // Opuesto
+        const markerX = bubble1.CONS + Math.cos(markerAngle) * radius1 * 1.3
+        const markerY = bubble1.HC + Math.sin(markerAngle) * radius1 * 1.3
+
+        markers.push(
+          <g key={`marker-${index}-1`}>
+            {/* Pequeño triángulo apuntando hacia la burbuja */}
+            <path
+              d={`M ${markerX} ${markerY}
+                  L ${markerX + Math.cos(markerAngle + 2.5) * 0.015} ${markerY + Math.sin(markerAngle + 2.5) * 0.015}
+                  L ${markerX + Math.cos(markerAngle - 2.5) * 0.015} ${markerY + Math.sin(markerAngle - 2.5) * 0.015}
+                  Z`}
+              fill={color1}
+              stroke="#FFFFFF"
+              strokeWidth={0.002}
+              opacity={0.9}
+            />
+          </g>
+        )
+        processedBubbles.add(bubble1.nombre)
+      }
+
+      if (!processedBubbles.has(bubble2.nombre)) {
+        // Posición del marcador en el borde de la burbuja 2 (opuesto a burbuja 1)
+        const markerAngle = angle // Apunta hacia burbuja 1
+        const markerX = bubble2.CONS + Math.cos(markerAngle) * radius2 * 1.3
+        const markerY = bubble2.HC + Math.sin(markerAngle) * radius2 * 1.3
+
+        markers.push(
+          <g key={`marker-${index}-2`}>
+            {/* Pequeño triángulo apuntando hacia la burbuja */}
+            <path
+              d={`M ${markerX} ${markerY}
+                  L ${markerX + Math.cos(markerAngle + 2.5) * 0.015} ${markerY + Math.sin(markerAngle + 2.5) * 0.015}
+                  L ${markerX + Math.cos(markerAngle - 2.5) * 0.015} ${markerY + Math.sin(markerAngle - 2.5) * 0.015}
+                  Z`}
+              fill={color2}
+              stroke="#FFFFFF"
+              strokeWidth={0.002}
+              opacity={0.9}
+            />
+          </g>
+        )
+        processedBubbles.add(bubble2.nombre)
+      }
+    })
+
+    return <g className="overlap-markers">{markers}</g>
   }
 
   // Custom legend - solo muestra tipos de medios activos
@@ -227,7 +402,7 @@ const BoxChart = forwardRef(({
           <ZAxis
             type="number"
             dataKey="tamano"
-            range={[600, 2500]}
+            range={[1500, 5000]}
             name="Tamaño"
           />
 
@@ -298,6 +473,9 @@ const BoxChart = forwardRef(({
               />
             </Scatter>
           )}
+
+          {/* Marcadores para burbujas que se solapan */}
+          <Customized component={renderOverlapMarkers} />
         </ScatterChart>
       </ResponsiveContainer>
 
