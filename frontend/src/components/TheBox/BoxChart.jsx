@@ -150,7 +150,44 @@ const BoxChart = forwardRef(({
     )
   }
 
-  // Custom label para cada punto - con mejor legibilidad
+  // Calcular posición desplazada para label cuando hay overlap
+  const getDisplacedPosition = (punto) => {
+    // Buscar si esta burbuja tiene overlaps
+    const overlap = connectorLines.find(
+      o => o.nombre1 === punto.nombre || o.nombre2 === punto.nombre
+    )
+
+    if (!overlap) {
+      return { x: 0, y: 0 } // Sin desplazamiento
+    }
+
+    // Determinar la otra burbuja con la que se solapa
+    const isFirst = overlap.nombre1 === punto.nombre
+    const otherCONS = isFirst ? overlap.CONS2 : overlap.CONS1
+    const otherHC = isFirst ? overlap.HC2 : overlap.HC1
+
+    // Calcular vector de separación (alejarse de la otra burbuja)
+    const dx = punto.CONS - otherCONS
+    const dy = punto.HC - otherHC
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    if (distance < 0.001) {
+      // Si están muy cerca, desplazar hacia arriba
+      return { x: 0, y: -25 }
+    }
+
+    // Normalizar y escalar el desplazamiento
+    const normalX = dx / distance
+    const normalY = dy / distance
+
+    // Desplazar en píxeles (aproximado)
+    return {
+      x: normalX * 35,
+      y: normalY * 35
+    }
+  }
+
+  // Custom label para cada punto - centrado por defecto, desplazado si hay overlap
   const renderCustomLabel = (props) => {
     const { x, y, value, cx, cy, payload } = props
 
@@ -176,28 +213,35 @@ const BoxChart = forwardRef(({
     const isHighlighted = punto.nombre === highlightedMedio
     const hasOverlapping = hasOverlap(punto.nombre)
 
-    // Si hay overlap, usar un fondo más visible y stroke más grueso
+    // Calcular desplazamiento si hay overlap
+    const displacement = hasOverlapping ? getDisplacedPosition(punto) : { x: 0, y: 0 }
+
     const fontSize = isHighlighted ? 13 : 10
-    const strokeWidth = hasOverlapping ? 0.8 : 0.3
+    const strokeWidth = 0.3
+
+    // Color de la burbuja para la línea conectora
+    const bubbleColor = punto.tipo === 'online' ? colorOnline : colorOffline
 
     return (
       <g>
-        {/* Fondo blanco semi-transparente para mejor legibilidad cuando hay overlap */}
+        {/* Línea conectora si el texto está desplazado */}
         {hasOverlapping && (
-          <rect
-            x={centerX - (punto.nombre.length * fontSize * 0.3)}
-            y={centerY - fontSize * 0.6}
-            width={punto.nombre.length * fontSize * 0.6}
-            height={fontSize * 1.2}
-            fill="rgba(0, 0, 0, 0.7)"
-            rx={3}
+          <line
+            x1={centerX}
+            y1={centerY}
+            x2={centerX + displacement.x}
+            y2={centerY + displacement.y}
+            stroke={isHighlighted ? highlightColor : bubbleColor}
+            strokeWidth={1.5}
+            strokeDasharray="3,3"
+            opacity={0.7}
             style={{ pointerEvents: 'none' }}
           />
         )}
 
         <text
-          x={centerX}
-          y={centerY}
+          x={centerX + displacement.x}
+          y={centerY + displacement.y}
           fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
           fontSize={fontSize}
           fontWeight={isHighlighted ? 'bold' : '600'}
@@ -214,52 +258,62 @@ const BoxChart = forwardRef(({
     )
   }
 
-  // Renderizar marcadores triangulares para burbujas que se solapan
-  const renderOverlapMarkers = () => {
-    if (connectorLines.length === 0) return null
+  // Componente para renderizar marcadores triangulares con las escalas del chart
+  const OverlapMarkers = ({ xScale, yScale }) => {
+    if (!xScale || !yScale || connectorLines.length === 0) return null
 
     const markers = []
     const processedBubbles = new Set()
+    const allData = [...dataOnline, ...dataOffline]
 
     connectorLines.forEach((overlap, index) => {
       // Obtener datos de ambas burbujas
-      const bubble1 = [...dataOnline, ...dataOffline].find(m => m.nombre === overlap.nombre1)
-      const bubble2 = [...dataOnline, ...dataOffline].find(m => m.nombre === overlap.nombre2)
+      const bubble1 = allData.find(m => m.nombre === overlap.nombre1)
+      const bubble2 = allData.find(m => m.nombre === overlap.nombre2)
 
       if (!bubble1 || !bubble2) return
 
-      // Calcular ángulo entre las burbujas
-      const dx = bubble2.CONS - bubble1.CONS
-      const dy = bubble2.HC - bubble1.HC
+      // Convertir coordenadas de datos a píxeles
+      const x1 = xScale(bubble1.CONS)
+      const y1 = yScale(bubble1.HC)
+      const x2 = xScale(bubble2.CONS)
+      const y2 = yScale(bubble2.HC)
+
+      // Calcular ángulo entre las burbujas en coordenadas de píxeles
+      const dx = x2 - x1
+      const dy = y2 - y1
       const angle = Math.atan2(dy, dx)
 
       // Colores de las burbujas
       const color1 = bubble1.tipo === 'online' ? colorOnline : colorOffline
       const color2 = bubble2.tipo === 'online' ? colorOnline : colorOffline
 
-      // Radio aproximado de las burbujas (en coordenadas de datos)
-      const radius1 = Math.sqrt(bubble1.tamano / 5000) * 0.06
-      const radius2 = Math.sqrt(bubble2.tamano / 5000) * 0.06
+      // Radio aproximado de las burbujas en píxeles (basado en el tamaño)
+      const radius1 = Math.sqrt(bubble1.tamano / Math.PI) * 0.8
+      const radius2 = Math.sqrt(bubble2.tamano / Math.PI) * 0.8
 
       // Solo agregar marcador si no lo hemos procesado
       if (!processedBubbles.has(bubble1.nombre)) {
         // Posición del marcador en el borde de la burbuja 1 (opuesto a burbuja 2)
         const markerAngle = angle + Math.PI // Opuesto
-        const markerX = bubble1.CONS + Math.cos(markerAngle) * radius1 * 1.3
-        const markerY = bubble1.HC + Math.sin(markerAngle) * radius1 * 1.3
+        const markerX = x1 + Math.cos(markerAngle) * radius1 * 1.15
+        const markerY = y1 + Math.sin(markerAngle) * radius1 * 1.15
+
+        // Tamaño del triángulo
+        const triangleSize = 8
 
         markers.push(
           <g key={`marker-${index}-1`}>
-            {/* Pequeño triángulo apuntando hacia la burbuja */}
+            {/* Triángulo apuntando hacia la burbuja */}
             <path
               d={`M ${markerX} ${markerY}
-                  L ${markerX + Math.cos(markerAngle + 2.5) * 0.015} ${markerY + Math.sin(markerAngle + 2.5) * 0.015}
-                  L ${markerX + Math.cos(markerAngle - 2.5) * 0.015} ${markerY + Math.sin(markerAngle - 2.5) * 0.015}
+                  L ${markerX + Math.cos(markerAngle + 2.6) * triangleSize} ${markerY + Math.sin(markerAngle + 2.6) * triangleSize}
+                  L ${markerX + Math.cos(markerAngle - 2.6) * triangleSize} ${markerY + Math.sin(markerAngle - 2.6) * triangleSize}
                   Z`}
               fill={color1}
               stroke="#FFFFFF"
-              strokeWidth={0.002}
-              opacity={0.9}
+              strokeWidth={1.5}
+              opacity={0.95}
             />
           </g>
         )
@@ -269,21 +323,24 @@ const BoxChart = forwardRef(({
       if (!processedBubbles.has(bubble2.nombre)) {
         // Posición del marcador en el borde de la burbuja 2 (opuesto a burbuja 1)
         const markerAngle = angle // Apunta hacia burbuja 1
-        const markerX = bubble2.CONS + Math.cos(markerAngle) * radius2 * 1.3
-        const markerY = bubble2.HC + Math.sin(markerAngle) * radius2 * 1.3
+        const markerX = x2 + Math.cos(markerAngle) * radius2 * 1.15
+        const markerY = y2 + Math.sin(markerAngle) * radius2 * 1.15
+
+        // Tamaño del triángulo
+        const triangleSize = 8
 
         markers.push(
           <g key={`marker-${index}-2`}>
-            {/* Pequeño triángulo apuntando hacia la burbuja */}
+            {/* Triángulo apuntando hacia la burbuja */}
             <path
               d={`M ${markerX} ${markerY}
-                  L ${markerX + Math.cos(markerAngle + 2.5) * 0.015} ${markerY + Math.sin(markerAngle + 2.5) * 0.015}
-                  L ${markerX + Math.cos(markerAngle - 2.5) * 0.015} ${markerY + Math.sin(markerAngle - 2.5) * 0.015}
+                  L ${markerX + Math.cos(markerAngle + 2.6) * triangleSize} ${markerY + Math.sin(markerAngle + 2.6) * triangleSize}
+                  L ${markerX + Math.cos(markerAngle - 2.6) * triangleSize} ${markerY + Math.sin(markerAngle - 2.6) * triangleSize}
                   Z`}
               fill={color2}
               stroke="#FFFFFF"
-              strokeWidth={0.002}
-              opacity={0.9}
+              strokeWidth={1.5}
+              opacity={0.95}
             />
           </g>
         )
@@ -475,7 +532,7 @@ const BoxChart = forwardRef(({
           )}
 
           {/* Marcadores para burbujas que se solapan */}
-          <Customized component={renderOverlapMarkers} />
+          <Customized component={OverlapMarkers} />
         </ScatterChart>
       </ResponsiveContainer>
 
