@@ -392,7 +392,7 @@ export default function Mougli({ user }) {
                   type="file"
                   accept=".txt"
                   onChange={handleMonitorChange}
-                  disabled={loading}
+                  disabled={loadingMonitor}
                   className="block w-full text-sm text-reset-gray-light
                     file:mr-4 file:py-2 file:px-4
                     file:rounded-reset-sm file:border-0
