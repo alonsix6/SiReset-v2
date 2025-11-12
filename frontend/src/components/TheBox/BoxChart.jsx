@@ -12,6 +12,7 @@ import {
   ReferenceLine,
   Cell,
   Label,
+  LabelList,
   Customized
 } from 'recharts'
 
@@ -124,53 +125,49 @@ const BoxChart = forwardRef(({
     return null
   }
 
-  // Componente para renderizar labels de burbujas directamente en el centro
-  const BubbleLabels = (props) => {
-    const { xScale, yScale, xAxisMap, yAxisMap } = props
+  // Custom label para cada punto - centrado en la burbuja
+  const renderCustomLabel = (props) => {
+    // LabelList pasa diferentes props según el tipo de chart
+    // Para Scatter, tenemos x, y, index, value, cx, cy, etc.
+    const { x, y, index, value, cx, cy, payload } = props
 
-    // Obtener las escalas correctas
-    const xScaleFunc = xScale || (xAxisMap && xAxisMap[0]?.scale)
-    const yScaleFunc = yScale || (yAxisMap && yAxisMap[0]?.scale)
+    // Usar cx, cy si están disponibles (coordenadas del centro), sino x, y
+    const centerX = cx !== undefined ? cx : x
+    const centerY = cy !== undefined ? cy : y
 
-    if (!xScaleFunc || !yScaleFunc) {
-      console.log('BubbleLabels: No scales available', { xScale, yScale, xAxisMap, yAxisMap })
+    // Si no hay coordenadas, no renderizar
+    if (centerX === undefined || centerY === undefined) {
       return null
     }
 
-    const allData = [...dataOnline, ...dataOffline]
-    console.log('BubbleLabels rendering', allData.length, 'labels')
+    // Obtener el punto de datos - puede venir en payload o buscar por value
+    let punto = payload
+    if (!punto) {
+      punto = [...dataOnline, ...dataOffline].find((d) => d.nombre === value)
+    }
+
+    if (!punto) {
+      return null
+    }
+
+    const isHighlighted = punto.nombre === highlightedMedio
 
     return (
-      <g className="bubble-labels">
-        {allData.map((punto, index) => {
-          // Convertir coordenadas de datos a píxeles
-          const centerX = xScaleFunc(punto.CONS)
-          const centerY = yScaleFunc(punto.HC)
-
-          const isHighlighted = punto.nombre === highlightedMedio
-          const fontSize = isHighlighted ? 13 : 10
-          const strokeWidth = 0.3
-
-          return (
-            <text
-              key={`label-${index}-${punto.nombre}`}
-              x={centerX}
-              y={centerY}
-              fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
-              fontSize={fontSize}
-              fontWeight={isHighlighted ? 'bold' : '600'}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              stroke="#000000"
-              strokeWidth={strokeWidth}
-              paintOrder="stroke"
-              style={{ pointerEvents: 'none' }}
-            >
-              {punto.nombre}
-            </text>
-          )
-        })}
-      </g>
+      <text
+        x={centerX}
+        y={centerY}
+        fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
+        fontSize={isHighlighted ? 13 : 10}
+        fontWeight={isHighlighted ? 'bold' : '600'}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        stroke="#000000"
+        strokeWidth={0.3}
+        paintOrder="stroke"
+        style={{ pointerEvents: 'none' }}
+      >
+        {punto.nombre}
+      </text>
     )
   }
 
@@ -185,9 +182,6 @@ const BoxChart = forwardRef(({
     if (!xScaleFunc || !yScaleFunc || connectorLines.length === 0) return null
 
     const markers = []
-    const allData = [...dataOnline, ...dataOffline]
-
-    console.log('OverlapMarkers rendering', connectorLines.length, 'overlaps')
 
     connectorLines.forEach((overlap, index) => {
       const bubble1 = overlap.bubble1
@@ -421,6 +415,10 @@ const BoxChart = forwardRef(({
                   opacity={entry.nombre === highlightedMedio ? 1 : 0.7}
                 />
               ))}
+              <LabelList
+                dataKey="nombre"
+                content={renderCustomLabel}
+              />
             </Scatter>
           )}
 
@@ -440,11 +438,12 @@ const BoxChart = forwardRef(({
                   opacity={entry.nombre === highlightedMedio ? 1 : 0.7}
                 />
               ))}
+              <LabelList
+                dataKey="nombre"
+                content={renderCustomLabel}
+              />
             </Scatter>
           )}
-
-          {/* Labels de burbujas - centradas en cada burbuja */}
-          <Customized component={BubbleLabels} />
 
           {/* Marcadores para burbujas que se solapan */}
           <Customized component={OverlapMarkers} />
