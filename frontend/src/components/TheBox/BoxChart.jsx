@@ -1,4 +1,4 @@
-import { forwardRef, useState, useEffect, useRef } from 'react'
+import { forwardRef, useState, useEffect } from 'react'
 import {
   ScatterChart,
   Scatter,
@@ -12,7 +12,6 @@ import {
   ReferenceLine,
   Cell,
   Label,
-  LabelList,
   Customized
 } from 'recharts'
 
@@ -125,49 +124,43 @@ const BoxChart = forwardRef(({
     return null
   }
 
-  // Custom label para cada punto - SIEMPRE centrado en la burbuja
-  const renderCustomLabel = (props) => {
-    const { x, y, value, cx, cy, payload } = props
+  // Componente para renderizar labels de burbujas directamente en el centro
+  const BubbleLabels = ({ xScale, yScale }) => {
+    if (!xScale || !yScale) return null
 
-    // Usar cx, cy si están disponibles (coordenadas del centro), sino x, y
-    let centerX = cx !== undefined ? cx : x
-    let centerY = cy !== undefined ? cy : y
-
-    // Si no hay coordenadas, no renderizar
-    if (centerX === undefined || centerY === undefined) {
-      return null
-    }
-
-    // Obtener el punto de datos
-    let punto = payload
-    if (!punto) {
-      punto = [...dataOnline, ...dataOffline].find((d) => d.nombre === value)
-    }
-
-    if (!punto) {
-      return null
-    }
-
-    const isHighlighted = punto.nombre === highlightedMedio
-    const fontSize = isHighlighted ? 13 : 10
-    const strokeWidth = 0.3
+    const allData = [...dataOnline, ...dataOffline]
 
     return (
-      <text
-        x={centerX}
-        y={centerY}
-        fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
-        fontSize={fontSize}
-        fontWeight={isHighlighted ? 'bold' : '600'}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        stroke="#000000"
-        strokeWidth={strokeWidth}
-        paintOrder="stroke"
-        style={{ pointerEvents: 'none' }}
-      >
-        {punto.nombre}
-      </text>
+      <g className="bubble-labels">
+        {allData.map((punto, index) => {
+          // Convertir coordenadas de datos a píxeles
+          const centerX = xScale(punto.CONS)
+          const centerY = yScale(punto.HC)
+
+          const isHighlighted = punto.nombre === highlightedMedio
+          const fontSize = isHighlighted ? 13 : 10
+          const strokeWidth = 0.3
+
+          return (
+            <text
+              key={`label-${index}-${punto.nombre}`}
+              x={centerX}
+              y={centerY}
+              fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
+              fontSize={fontSize}
+              fontWeight={isHighlighted ? 'bold' : '600'}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              stroke="#000000"
+              strokeWidth={strokeWidth}
+              paintOrder="stroke"
+              style={{ pointerEvents: 'none' }}
+            >
+              {punto.nombre}
+            </text>
+          )
+        })}
+      </g>
     )
   }
 
@@ -410,10 +403,6 @@ const BoxChart = forwardRef(({
                   opacity={entry.nombre === highlightedMedio ? 1 : 0.7}
                 />
               ))}
-              <LabelList
-                dataKey="nombre"
-                content={renderCustomLabel}
-              />
             </Scatter>
           )}
 
@@ -433,12 +422,11 @@ const BoxChart = forwardRef(({
                   opacity={entry.nombre === highlightedMedio ? 1 : 0.7}
                 />
               ))}
-              <LabelList
-                dataKey="nombre"
-                content={renderCustomLabel}
-              />
             </Scatter>
           )}
+
+          {/* Labels de burbujas - centradas en cada burbuja */}
+          <Customized component={BubbleLabels} />
 
           {/* Marcadores para burbujas que se solapan */}
           <Customized component={OverlapMarkers} />
