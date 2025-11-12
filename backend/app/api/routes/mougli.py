@@ -16,6 +16,7 @@ from app.core.database import get_db
 from app.api.deps import get_current_user, require_module
 from app.models.user import User
 from app.processors.monitor_processor import procesar_monitor_txt
+from app.processors.outview_processor import procesar_outview_excel
 
 logger = logging.getLogger('mougli.api')
 
@@ -126,6 +127,91 @@ async def procesar_monitor(
     )
 
 
+@router.post("/procesar-outview")
+async def procesar_outview(
+    outview: UploadFile,
+    current_user: User = Depends(require_module("Mougli"))
+) -> StreamingResponse:
+    """
+    Procesa archivo OutView .xlsx y retorna Excel
+
+    Valida:
+    - Usuario tiene acceso al módulo Mougli
+    - Archivo es .xlsx
+    - Tamaño máximo 100MB
+    - Formato Excel válido
+
+    Args:
+        outview: Archivo .xlsx de Kantar Ibope Media
+
+    Returns:
+        StreamingResponse con Excel procesado
+
+    Raises:
+        HTTPException 400: Archivo inválido (extensión, tamaño, formato)
+        HTTPException 403: Sin acceso al módulo
+        HTTPException 500: Error interno de procesamiento
+    """
+    logger.info(f"Usuario {current_user.email} procesando OutView: {outview.filename}")
+
+    # 1. Validar extensión
+    if not outview.filename.endswith('.xlsx'):
+        logger.warning(f"Extensión inválida: {outview.filename}")
+        raise HTTPException(
+            status_code=400,
+            detail="Archivo debe ser .xlsx"
+        )
+
+    # 2. Leer contenido y validar tamaño
+    try:
+        content = await outview.read()
+    except Exception as e:
+        logger.error(f"Error leyendo archivo: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error leyendo archivo"
+        )
+
+    size_mb = len(content) / (1024 * 1024)
+
+    if size_mb > 100:
+        logger.warning(f"Archivo muy grande: {size_mb:.1f}MB")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Archivo muy grande ({size_mb:.1f}MB). Máximo: 100MB"
+        )
+
+    logger.info(f"Archivo leído: {size_mb:.2f}MB")
+
+    # 3. Procesar archivo
+    try:
+        excel_output = procesar_outview_excel(content)
+        logger.info("Procesamiento completado exitosamente")
+
+    except ValueError as e:
+        logger.error(f"Error de validación: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Archivo inválido: {str(e)}"
+        )
+
+    except Exception as e:
+        logger.error(f"Error procesando OutView: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno al procesar archivo: {str(e)}"
+        )
+
+    # 4. Retornar Excel
+    return StreamingResponse(
+        excel_output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=OutView_Procesado.xlsx"
+        }
+    )
+
+
 @router.get("/health")
 async def health_check():
     """
@@ -138,6 +224,7 @@ async def health_check():
         "status": "ok",
         "module": "Mougli",
         "endpoints": {
-            "procesar-monitor": "POST /api/mougli/procesar-monitor"
+            "procesar-monitor": "POST /api/mougli/procesar-monitor",
+            "procesar-outview": "POST /api/mougli/procesar-outview"
         }
     }

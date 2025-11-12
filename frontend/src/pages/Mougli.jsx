@@ -3,16 +3,20 @@ import axios from 'axios'
 
 export default function Mougli({ user }) {
   const [monitorFile, setMonitorFile] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [outviewFile, setOutviewFile] = useState(null)
+  const [loadingMonitor, setLoadingMonitor] = useState(false)
+  const [loadingOutview, setLoadingOutview] = useState(false)
+  const [errorMonitor, setErrorMonitor] = useState('')
+  const [errorOutview, setErrorOutview] = useState('')
+  const [successMonitor, setSuccessMonitor] = useState('')
+  const [successOutview, setSuccessOutview] = useState('')
 
   const handleMonitorChange = (e) => {
     const file = e.target.files[0]
     if (file) {
       // Validar extensión
       if (!file.name.endsWith('.txt')) {
-        setError('El archivo debe ser .txt')
+        setErrorMonitor('El archivo debe ser .txt')
         setMonitorFile(null)
         return
       }
@@ -20,26 +24,50 @@ export default function Mougli({ user }) {
       // Validar tamaño (100MB)
       const sizeMB = file.size / (1024 * 1024)
       if (sizeMB > 100) {
-        setError(`Archivo muy grande (${sizeMB.toFixed(1)}MB). Máximo: 100MB`)
+        setErrorMonitor(`Archivo muy grande (${sizeMB.toFixed(1)}MB). Máximo: 100MB`)
         setMonitorFile(null)
         return
       }
 
       setMonitorFile(file)
-      setError('')
-      setSuccess('')
+      setErrorMonitor('')
+      setSuccessMonitor('')
+    }
+  }
+
+  const handleOutviewChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      // Validar extensión
+      if (!file.name.endsWith('.xlsx')) {
+        setErrorOutview('El archivo debe ser .xlsx')
+        setOutviewFile(null)
+        return
+      }
+
+      // Validar tamaño (100MB)
+      const sizeMB = file.size / (1024 * 1024)
+      if (sizeMB > 100) {
+        setErrorOutview(`Archivo muy grande (${sizeMB.toFixed(1)}MB). Máximo: 100MB`)
+        setOutviewFile(null)
+        return
+      }
+
+      setOutviewFile(file)
+      setErrorOutview('')
+      setSuccessOutview('')
     }
   }
 
   const procesarMonitor = async () => {
     if (!monitorFile) {
-      setError('Por favor selecciona un archivo Monitor')
+      setErrorMonitor('Por favor selecciona un archivo Monitor')
       return
     }
 
-    setLoading(true)
-    setError('')
-    setSuccess('')
+    setLoadingMonitor(true)
+    setErrorMonitor('')
+    setSuccessMonitor('')
 
     try {
       const token = localStorage.getItem('token')
@@ -68,7 +96,7 @@ export default function Mougli({ user }) {
       link.remove()
       window.URL.revokeObjectURL(url)
 
-      setSuccess('Archivo procesado exitosamente')
+      setSuccessMonitor('Archivo procesado exitosamente')
       setMonitorFile(null)
       // Reset file input
       document.getElementById('monitor-input').value = ''
@@ -81,15 +109,77 @@ export default function Mougli({ user }) {
         const text = await err.response.data.text()
         try {
           const errorData = JSON.parse(text)
-          setError(errorData.detail || 'Error procesando archivo')
+          setErrorMonitor(errorData.detail || 'Error procesando archivo')
         } catch {
-          setError('Error procesando archivo. Por favor verifica el formato.')
+          setErrorMonitor('Error procesando archivo. Por favor verifica el formato.')
         }
       } else {
-        setError(err.response?.data?.detail || 'Error procesando archivo. Intenta de nuevo.')
+        setErrorMonitor(err.response?.data?.detail || 'Error procesando archivo. Intenta de nuevo.')
       }
     } finally {
-      setLoading(false)
+      setLoadingMonitor(false)
+    }
+  }
+
+  const procesarOutview = async () => {
+    if (!outviewFile) {
+      setErrorOutview('Por favor selecciona un archivo OutView')
+      return
+    }
+
+    setLoadingOutview(true)
+    setErrorOutview('')
+    setSuccessOutview('')
+
+    try {
+      const token = localStorage.getItem('token')
+      const formData = new FormData()
+      formData.append('outview', outviewFile)
+
+      const response = await axios.post(
+        '/api/mougli/procesar-outview',
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          },
+          responseType: 'blob'
+        }
+      )
+
+      // Descargar Excel
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'OutView_Procesado.xlsx')
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      setSuccessOutview('Archivo procesado exitosamente')
+      setOutviewFile(null)
+      // Reset file input
+      document.getElementById('outview-input').value = ''
+
+    } catch (err) {
+      console.error('Error procesando OutView:', err)
+
+      if (err.response?.data instanceof Blob) {
+        // Convertir Blob a texto para leer el mensaje de error
+        const text = await err.response.data.text()
+        try {
+          const errorData = JSON.parse(text)
+          setErrorOutview(errorData.detail || 'Error procesando archivo')
+        } catch {
+          setErrorOutview('Error procesando archivo. Por favor verifica el formato.')
+        }
+      } else {
+        setErrorOutview(err.response?.data?.detail || 'Error procesando archivo. Intenta de nuevo.')
+      }
+    } finally {
+      setLoadingOutview(false)
     }
   }
 
@@ -107,7 +197,7 @@ export default function Mougli({ user }) {
             MOUGLI
           </h1>
           <p className="text-reset-gray-light text-base lg:text-lg max-w-2xl">
-            Procesa archivos Monitor de Kantar Ibope Media (TV, Cable, Radio, Revista, Diarios)
+            Procesa archivos Monitor (ATL) y OutView (OOH) de Kantar Ibope Media
           </p>
         </div>
 
@@ -193,21 +283,21 @@ export default function Mougli({ user }) {
               </div>
 
               {/* Error Message */}
-              {error && (
+              {errorMonitor && (
                 <div className="alert-error animate-fade-in">
                   <div className="flex items-center">
                     <span className="mr-2 text-2xl">⚠</span>
-                    <span>{error}</span>
+                    <span>{errorMonitor}</span>
                   </div>
                 </div>
               )}
 
               {/* Success Message */}
-              {success && (
+              {successMonitor && (
                 <div className="bg-green-500 bg-opacity-10 border-l-4 border-green-500 text-green-500 p-4 rounded-reset animate-fade-in">
                   <div className="flex items-center">
                     <span className="mr-2 text-2xl">✓</span>
-                    <span className="font-semibold">{success}</span>
+                    <span className="font-semibold">{successMonitor}</span>
                   </div>
                 </div>
               )}
@@ -215,16 +305,136 @@ export default function Mougli({ user }) {
               {/* Process Button */}
               <button
                 onClick={procesarMonitor}
-                disabled={!monitorFile || loading}
-                className={`w-full ${loading || !monitorFile ? 'btn-disabled' : 'btn-primary'}`}
+                disabled={!monitorFile || loadingMonitor}
+                className={`w-full ${loadingMonitor || !monitorFile ? 'btn-disabled' : 'btn-primary'}`}
               >
-                {loading ? (
+                {loadingMonitor ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-reset-black mr-2"></div>
                     Procesando...
                   </div>
                 ) : (
                   'Procesar Monitor'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* OutView Card */}
+        <div className="card-reset-shadow mb-8 animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+          {/* Info Box */}
+          <div className="bg-reset-gray-dark border-l-4 border-reset-magenta rounded-reset p-6 mb-6">
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 bg-reset-magenta bg-opacity-20 rounded-full flex items-center justify-center">
+                  <span className="text-reset-magenta text-xl">ℹ</span>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-reset-white font-semibold mb-3 uppercase tracking-wide">
+                  Información del Procesador OutView
+                </h3>
+                <ul className="text-reset-gray-light text-sm space-y-2">
+                  <li className="flex items-start">
+                    <span className="text-reset-magenta mr-2 mt-0.5">▶</span>
+                    <div>
+                      <span className="font-semibold">Input:</span> Archivo .xlsx de Kantar Ibope (publicidad exterior)
+                    </div>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-reset-magenta mr-2 mt-0.5">▶</span>
+                    <div>
+                      <span className="font-semibold">Output:</span> Excel con tarifas calculadas en 9 pasos
+                    </div>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-reset-magenta mr-2 mt-0.5">▶</span>
+                    <div>
+                      <span className="font-semibold">Cálculo:</span> Denominadores diarios/mensuales, topes por elemento, factores LED/Otros
+                    </div>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-reset-magenta mr-2 mt-0.5">▶</span>
+                    <div>
+                      <span className="font-semibold">Tamaño máximo:</span> 100MB
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* OutView File Upload */}
+          <div>
+            <h2 className="font-display text-2xl lg:text-3xl text-reset-white mb-4 lg:mb-6 uppercase">
+              Procesar <span className="text-reset-magenta">OutView</span>
+            </h2>
+
+            <div className="space-y-4">
+              {/* File Input */}
+              <div>
+                <label htmlFor="outview-input" className="block text-sm font-semibold text-reset-white mb-2 uppercase tracking-wide">
+                  Archivo OutView (.xlsx)
+                </label>
+                <input
+                  id="outview-input"
+                  type="file"
+                  accept=".xlsx"
+                  onChange={handleOutviewChange}
+                  disabled={loadingOutview}
+                  className="block w-full text-sm text-reset-gray-light
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-reset-sm file:border-0
+                    file:text-sm file:font-semibold file:uppercase file:tracking-wide
+                    file:bg-reset-magenta file:text-reset-black
+                    hover:file:bg-opacity-80
+                    file:cursor-pointer
+                    cursor-pointer
+                    bg-reset-gray-dark border border-reset-gray-medium rounded-reset
+                    focus:outline-none focus:border-reset-magenta
+                    disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {outviewFile && (
+                  <p className="mt-2 text-sm text-reset-neon">
+                    ✓ Archivo seleccionado: {outviewFile.name} ({(outviewFile.size / 1024).toFixed(2)} KB)
+                  </p>
+                )}
+              </div>
+
+              {/* Error Message */}
+              {errorOutview && (
+                <div className="alert-error animate-fade-in">
+                  <div className="flex items-center">
+                    <span className="mr-2 text-2xl">⚠</span>
+                    <span>{errorOutview}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Success Message */}
+              {successOutview && (
+                <div className="bg-green-500 bg-opacity-10 border-l-4 border-green-500 text-green-500 p-4 rounded-reset animate-fade-in">
+                  <div className="flex items-center">
+                    <span className="mr-2 text-2xl">✓</span>
+                    <span className="font-semibold">{successOutview}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Process Button */}
+              <button
+                onClick={procesarOutview}
+                disabled={!outviewFile || loadingOutview}
+                className={`w-full ${loadingOutview || !outviewFile ? 'btn-disabled' : 'bg-reset-magenta text-reset-black font-bold py-3 px-6 rounded-reset-sm uppercase tracking-wide hover:bg-opacity-80 transition-all duration-200'}`}
+              >
+                {loadingOutview ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-reset-black mr-2"></div>
+                    Procesando...
+                  </div>
+                ) : (
+                  'Procesar OutView'
                 )}
               </button>
             </div>
