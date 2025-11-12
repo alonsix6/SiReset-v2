@@ -125,6 +125,51 @@ const BoxChart = forwardRef(({
     return null
   }
 
+  // Verificar si una burbuja tiene overlaps
+  const hasOverlap = (nombreMedio) => {
+    return connectorLines.some(
+      overlap => overlap.nombre1 === nombreMedio || overlap.nombre2 === nombreMedio
+    )
+  }
+
+  // Calcular posición desplazada para label cuando hay overlap
+  const getDisplacedPosition = (punto, centerX, centerY) => {
+    // Buscar si esta burbuja tiene overlaps
+    const overlap = connectorLines.find(
+      o => o.nombre1 === punto.nombre || o.nombre2 === punto.nombre
+    )
+
+    if (!overlap) {
+      return { x: 30, y: 35, hasDisplacement: false } // Posición normal
+    }
+
+    // Determinar la otra burbuja con la que se solapa
+    const isFirst = overlap.nombre1 === punto.nombre
+    const otherCONS = isFirst ? overlap.CONS2 : overlap.CONS1
+    const otherHC = isFirst ? overlap.HC2 : overlap.HC1
+
+    // Calcular vector de separación (alejarse de la otra burbuja)
+    const dx = punto.CONS - otherCONS
+    const dy = punto.HC - otherHC
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    if (distance < 0.001) {
+      // Si están muy cerca, desplazar hacia arriba
+      return { x: 30, y: -40, hasDisplacement: true }
+    }
+
+    // Normalizar y escalar el desplazamiento
+    const normalX = dx / distance
+    const normalY = dy / distance
+
+    // Desplazar más cuando hay overlap
+    return {
+      x: 30 + normalX * 50,
+      y: 35 + normalY * 50,
+      hasDisplacement: true
+    }
+  }
+
   // Custom label para cada punto - centrado en la burbuja
   const renderCustomLabel = (props) => {
     // LabelList pasa diferentes props según el tipo de chart
@@ -152,26 +197,47 @@ const BoxChart = forwardRef(({
 
     const isHighlighted = punto.nombre === highlightedMedio
 
-    // Ajustar posición para que se vea visualmente centrado
-    const adjustedX = centerX + 35
-    const adjustedY = centerY + 35
+    // Calcular desplazamiento (normal o extra si hay overlap)
+    const displacement = getDisplacedPosition(punto, centerX, centerY)
+    const adjustedX = centerX + displacement.x
+    const adjustedY = centerY + displacement.y
+
+    // Color de la burbuja para la línea conectora
+    const bubbleColor = punto.tipo === 'online' ? colorOnline : colorOffline
 
     return (
-      <text
-        x={adjustedX}
-        y={adjustedY}
-        fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
-        fontSize={isHighlighted ? 13 : 10}
-        fontWeight={isHighlighted ? 'bold' : '600'}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        stroke="#000000"
-        strokeWidth={0.3}
-        paintOrder="stroke"
-        style={{ pointerEvents: 'none' }}
-      >
-        {punto.nombre}
-      </text>
+      <g>
+        {/* Línea conectora si el texto está desplazado por overlap */}
+        {displacement.hasDisplacement && (
+          <line
+            x1={centerX + 30}
+            y1={centerY + 35}
+            x2={adjustedX}
+            y2={adjustedY}
+            stroke={isHighlighted ? highlightColor : bubbleColor}
+            strokeWidth={1}
+            strokeDasharray="3,3"
+            opacity={0.6}
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
+
+        <text
+          x={adjustedX}
+          y={adjustedY}
+          fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
+          fontSize={isHighlighted ? 13 : 10}
+          fontWeight={isHighlighted ? 'bold' : '600'}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          stroke="#000000"
+          strokeWidth={0.3}
+          paintOrder="stroke"
+          style={{ pointerEvents: 'none' }}
+        >
+          {punto.nombre}
+        </text>
+      </g>
     )
   }
 
