@@ -24,8 +24,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copiar código de la aplicación
 COPY app/ ./app/
 
-# Copiar datos GADM (necesarios para Mapito)
-COPY ../data/ ./data/
+# Nota: datos GADM se montan via volumes en docker-compose.yml
+# Para producción, usar el Dockerfile en la raíz del proyecto
 
 # Crear usuario no-root para seguridad
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
