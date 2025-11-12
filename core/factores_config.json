@@ -5,8 +5,5 @@
     "RADIO": 0.425,
     "REVISTA": 0.14875,
     "DIARIOS": 0.14875
-  },
-  "outview": {
-    "tarifa_superficie_factor": 1.25
   }
 }
