@@ -152,10 +152,14 @@ const BoxChart = forwardRef(({
 
     const isHighlighted = punto.nombre === highlightedMedio
 
+    // Ajustar posición para que se vea visualmente centrado
+    const adjustedX = centerX + 2
+    const adjustedY = centerY + 3
+
     return (
       <text
-        x={centerX}
-        y={centerY}
+        x={adjustedX}
+        y={adjustedY}
         fill={isHighlighted ? highlightColor : (colorTexto || '#FFFFFF')}
         fontSize={isHighlighted ? 13 : 10}
         fontWeight={isHighlighted ? 'bold' : '600'}
