@@ -132,7 +132,7 @@ const BoxChart = forwardRef(({
     )
   }
 
-  // Calcular posición desplazada para label cuando hay overlap
+  // Calcular posición desplazada para label cuando hay overlap - buscar espacio libre
   const getDisplacedPosition = (punto, centerX, centerY) => {
     // Buscar si esta burbuja tiene overlaps
     const overlap = connectorLines.find(
@@ -143,29 +143,40 @@ const BoxChart = forwardRef(({
       return { x: 30, y: 35, hasDisplacement: false } // Posición normal
     }
 
-    // Determinar la otra burbuja con la que se solapa
-    const isFirst = overlap.nombre1 === punto.nombre
-    const otherCONS = isFirst ? overlap.CONS2 : overlap.CONS1
-    const otherHC = isFirst ? overlap.HC2 : overlap.HC1
+    // Obtener todas las burbujas para detectar colisiones
+    const allData = [...dataOnline, ...dataOffline]
 
-    // Calcular vector de separación (alejarse de la otra burbuja)
-    const dx = punto.CONS - otherCONS
-    const dy = punto.HC - otherHC
-    const distance = Math.sqrt(dx * dx + dy * dy)
+    // Probar diferentes ángulos para encontrar el espacio más libre
+    const testAngles = [0, 45, 90, 135, 180, 225, 270, 315] // Ángulos en grados
+    let bestAngle = 0
+    let maxDistance = 0
 
-    if (distance < 0.001) {
-      // Si están muy cerca, desplazar hacia arriba
-      return { x: 30, y: -40, hasDisplacement: true }
-    }
+    testAngles.forEach(angleDeg => {
+      const angleRad = (angleDeg * Math.PI) / 180
+      const testX = punto.CONS + Math.cos(angleRad) * 0.15 // Distancia en coordenadas de datos
+      const testY = punto.HC + Math.sin(angleRad) * 0.15
 
-    // Normalizar y escalar el desplazamiento
-    const normalX = dx / distance
-    const normalY = dy / distance
+      // Calcular distancia mínima a otras burbujas desde este punto de prueba
+      let minDistToOthers = Infinity
+      allData.forEach(other => {
+        if (other.nombre === punto.nombre) return
+        const dx = testX - other.CONS
+        const dy = testY - other.HC
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        minDistToOthers = Math.min(minDistToOthers, dist)
+      })
 
-    // Desplazar más cuando hay overlap
+      // Este ángulo es mejor si está más lejos de otras burbujas
+      if (minDistToOthers > maxDistance) {
+        maxDistance = minDistToOthers
+        bestAngle = angleRad
+      }
+    })
+
+    // Usar el mejor ángulo encontrado
     return {
-      x: 30 + normalX * 50,
-      y: 35 + normalY * 50,
+      x: 30 + Math.cos(bestAngle) * 60,
+      y: 35 + Math.sin(bestAngle) * 60,
       hasDisplacement: true
     }
   }
