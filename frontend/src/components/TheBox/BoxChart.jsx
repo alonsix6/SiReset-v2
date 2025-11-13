@@ -490,7 +490,7 @@ const BoxChart = forwardRef(({
       <div ref={svgRef}>
         <ResponsiveContainer width="100%" height={600}>
           <ScatterChart
-            margin={{ top: 40, right: 40, bottom: 60, left: 60 }}
+            margin={{ top: 80, right: 80, bottom: 80, left: 80 }}
           >
           <CartesianGrid
             strokeDasharray="3 3"
