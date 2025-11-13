@@ -63,9 +63,9 @@ const BoxChart = forwardRef(({
         const distance = Math.sqrt(dx * dx + dy * dy)
 
         // Estimar radios de las burbujas (aproximación basada en ZAxis range)
-        // range es [1500, 5000], el radio visual es proporcional a sqrt(tamano)
-        const radius1 = Math.sqrt(bubble1.tamano / 5000) * 0.08
-        const radius2 = Math.sqrt(bubble2.tamano / 5000) * 0.08
+        // range es [2000, 8000], el radio visual es proporcional a sqrt(tamano)
+        const radius1 = Math.sqrt(bubble1.tamano / 8000) * 0.08
+        const radius2 = Math.sqrt(bubble2.tamano / 8000) * 0.08
 
         // Solo detectar si REALMENTE se solapan (distancia menor que la suma de radios)
         if (distance < (radius1 + radius2) * 0.95) {
@@ -359,14 +359,14 @@ const BoxChart = forwardRef(({
       const color1 = bubble1.tipo === 'online' ? colorOnline : colorOffline
       const color2 = bubble2.tipo === 'online' ? colorOnline : colorOffline
 
-      // Calcular radio de burbujas en píxeles (el ZAxis range es [1500, 5000])
+      // Calcular radio de burbujas en píxeles (el ZAxis range es [2000, 8000])
       // Recharts usa sqrt del valor para el radio
       const getRadius = (tamano) => {
-        // Normalizar el tamaño dentro del rango [1500, 5000]
-        const normalized = (tamano - 1500) / (5000 - 1500)
+        // Normalizar el tamaño dentro del rango [2000, 8000]
+        const normalized = (tamano - 2000) / (8000 - 2000)
         // Radio base y máximo (aproximados basados en el comportamiento de Recharts)
-        const minRadius = 20
-        const maxRadius = 50
+        const minRadius = 30
+        const maxRadius = 70
         return minRadius + normalized * (maxRadius - minRadius)
       }
 
@@ -537,7 +537,7 @@ const BoxChart = forwardRef(({
           <ZAxis
             type="number"
             dataKey="tamano"
-            range={[1500, 5000]}
+            range={[2000, 8000]}
             name="Tamaño"
           />
 
