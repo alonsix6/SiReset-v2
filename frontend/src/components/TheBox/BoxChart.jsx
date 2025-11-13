@@ -1,4 +1,4 @@
-import { forwardRef, useState, useEffect } from 'react'
+import { forwardRef, useState, useEffect, useRef } from 'react'
 import {
   ScatterChart,
   Scatter,
@@ -39,7 +39,7 @@ const BoxChart = forwardRef(({
   // Estado para posiciones manuales de labels
   const [manualPositions, setManualPositions] = useState({})
   const [draggingLabel, setDraggingLabel] = useState(null)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const svgRef = useRef(null)
 
   // Detectar burbujas que se solapan y necesitan indicadores
   const detectOverlappingBubbles = () => {
@@ -196,47 +196,57 @@ const BoxChart = forwardRef(({
   }
 
   // Handlers para drag & drop de labels
-  const handleLabelMouseDown = (e, punto, centerX, centerY, currentX, currentY) => {
+  const handleLabelMouseDown = (e, punto) => {
     e.stopPropagation()
     e.preventDefault()
-
-    // Obtener coordenadas del SVG
-    const svgElement = e.currentTarget.ownerSVGElement
-    const rect = svgElement.getBoundingClientRect()
-
-    setDraggingLabel(punto.nombre)
-    setDragOffset({
-      x: e.clientX - rect.left - currentX,
-      y: e.clientY - rect.top - currentY,
-      centerX: centerX,
-      centerY: centerY
-    })
+    setDraggingLabel({ nombre: punto.nombre, startX: e.clientX, startY: e.clientY })
   }
 
-  const handleMouseMove = (e) => {
+  // Agregar listeners globales para el drag
+  useEffect(() => {
     if (!draggingLabel) return
 
-    // Obtener el SVG element correctamente
-    const svgElement = e.currentTarget.querySelector('svg') || e.currentTarget
-    const rect = svgElement.getBoundingClientRect()
+    const handleMouseMove = (e) => {
+      if (!svgRef.current) return
 
-    // Calcular posición del mouse relativa al SVG
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
+      const svg = svgRef.current.querySelector('.recharts-surface')
+      if (!svg) return
 
-    // Calcular offset desde el centro de la burbuja
-    const offsetX = mouseX - dragOffset.x - dragOffset.centerX
-    const offsetY = mouseY - dragOffset.y - dragOffset.centerY
+      const rect = svg.getBoundingClientRect()
+      const punto = [...dataOnline, ...dataOffline].find(d => d.nombre === draggingLabel.nombre)
+      if (!punto) return
 
-    setManualPositions(prev => ({
-      ...prev,
-      [draggingLabel]: { x: offsetX, y: offsetY }
-    }))
-  }
+      // Calcular desplazamiento desde la posición inicial del drag
+      const deltaX = e.clientX - draggingLabel.startX
+      const deltaY = e.clientY - draggingLabel.startY
 
-  const handleMouseUp = () => {
-    setDraggingLabel(null)
-  }
+      // Obtener posición actual o usar la base
+      const currentPos = manualPositions[draggingLabel.nombre] || { x: 30, y: 35 }
+
+      setManualPositions(prev => ({
+        ...prev,
+        [draggingLabel.nombre]: {
+          x: currentPos.x + deltaX,
+          y: currentPos.y + deltaY
+        }
+      }))
+
+      // Actualizar punto de inicio para el próximo movimiento
+      setDraggingLabel({ ...draggingLabel, startX: e.clientX, startY: e.clientY })
+    }
+
+    const handleMouseUp = () => {
+      setDraggingLabel(null)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [draggingLabel, manualPositions, dataOnline, dataOffline])
 
   // Custom label para cada punto - centrado en la burbuja
   const renderCustomLabel = (props) => {
@@ -273,7 +283,7 @@ const BoxChart = forwardRef(({
     // Color de la burbuja para la línea conectora
     const bubbleColor = punto.tipo === 'online' ? colorOnline : colorOffline
 
-    const isDragging = draggingLabel === punto.nombre
+    const isDragging = draggingLabel?.nombre === punto.nombre
 
     return (
       <g>
@@ -308,7 +318,7 @@ const BoxChart = forwardRef(({
             opacity: isDragging ? 0.5 : 1,
             userSelect: 'none'
           }}
-          onMouseDown={(e) => handleLabelMouseDown(e, punto, centerX, centerY, adjustedX, adjustedY)}
+          onMouseDown={(e) => handleLabelMouseDown(e, punto)}
         >
           {punto.nombre}
         </text>
@@ -477,13 +487,11 @@ const BoxChart = forwardRef(({
       </div>
 
       {/* Gráfico */}
-      <ResponsiveContainer width="100%" height={600}>
-        <ScatterChart
-          margin={{ top: 40, right: 40, bottom: 60, left: 60 }}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
+      <div ref={svgRef}>
+        <ResponsiveContainer width="100%" height={600}>
+          <ScatterChart
+            margin={{ top: 40, right: 40, bottom: 60, left: 60 }}
+          >
           <CartesianGrid
             strokeDasharray="3 3"
             stroke="rgba(170, 170, 170, 0.2)"
@@ -605,6 +613,7 @@ const BoxChart = forwardRef(({
           <Customized component={OverlapMarkers} />
         </ScatterChart>
       </ResponsiveContainer>
+      </div>
 
       {/* Leyenda personalizada */}
       {renderLegend()}
