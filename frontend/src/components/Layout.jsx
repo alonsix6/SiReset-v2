@@ -1,28 +1,50 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
 
 export default function Layout({ user, onLogout, children }) {
   const location = useLocation()
+  const [isAppsDropdownOpen, setIsAppsDropdownOpen] = useState(false)
+  const dropdownRef = useRef(null)
 
-  const navigation = [
-    { name: 'Dashboard', path: '/', icon: '▶', module: null },
+  // Apps disponibles
+  const apps = [
     { name: 'Mougli', path: '/mougli', icon: '▶', module: 'Mougli' },
     { name: 'Mapito', path: '/mapito', icon: '▶', module: 'Mapito' },
     { name: 'The Box', path: '/thebox', icon: '▶', module: 'TheBox' },
+  ]
+
+  // Navegación principal (Dashboard y Admin)
+  const mainNavigation = [
+    { name: 'Dashboard', path: '/', icon: '▶' },
     { name: 'Admin', path: '/admin', icon: '▶', adminOnly: true },
   ]
 
-  const visibleNav = navigation.filter(item => {
-    // Admin menu only for admin users
+  // Filtrar apps según permisos del usuario
+  const visibleApps = apps.filter(app =>
+    user.role === 'admin' || user.modules.includes(app.module)
+  )
+
+  // Filtrar navegación principal
+  const visibleMainNav = mainNavigation.filter(item => {
     if (item.adminOnly) {
       return user.role === 'admin'
     }
-    // Dashboard is visible for all
-    if (!item.module) {
-      return true
-    }
-    // Module-based filtering
-    return user.role === 'admin' || user.modules.includes(item.module)
+    return true
   })
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsAppsDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Verificar si estamos en alguna página de app
+  const isInAppPage = apps.some(app => location.pathname === app.path)
 
   return (
     <div className="min-h-screen bg-reset-black">
@@ -41,7 +63,8 @@ export default function Layout({ user, onLogout, children }) {
 
             {/* Navigation Links - Desktop */}
             <div className="hidden md:flex items-center space-x-1">
-              {visibleNav.map((item) => (
+              {/* Navegación principal */}
+              {visibleMainNav.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
@@ -59,6 +82,57 @@ export default function Layout({ user, onLogout, children }) {
                   {item.name}
                 </Link>
               ))}
+
+              {/* Dropdown de Apps */}
+              {visibleApps.length > 0 && (
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setIsAppsDropdownOpen(!isAppsDropdownOpen)}
+                    className={`flex items-center px-4 py-2 rounded-reset-sm font-body font-semibold text-sm uppercase tracking-wide transition-all duration-200 ${
+                      isInAppPage
+                        ? 'bg-reset-neon text-reset-black'
+                        : 'text-reset-white hover:bg-reset-gray-dark hover:text-reset-neon'
+                    }`}
+                  >
+                    <span className={`mr-2 text-xs ${
+                      isInAppPage ? 'text-reset-black' : 'text-reset-neon'
+                    }`}>
+                      ▶
+                    </span>
+                    Apps
+                    <span className={`ml-2 text-xs transition-transform duration-200 ${
+                      isAppsDropdownOpen ? 'rotate-180' : ''
+                    }`}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isAppsDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-1 min-w-[180px] bg-reset-gray-dark border border-reset-gray-medium rounded-reset-sm shadow-lg overflow-hidden z-50">
+                      {visibleApps.map((app) => (
+                        <Link
+                          key={app.path}
+                          to={app.path}
+                          onClick={() => setIsAppsDropdownOpen(false)}
+                          className={`flex items-center px-4 py-3 font-body font-semibold text-sm uppercase tracking-wide transition-all duration-200 ${
+                            location.pathname === app.path
+                              ? 'bg-reset-neon text-reset-black'
+                              : 'text-reset-white hover:bg-reset-gray-darker hover:text-reset-neon'
+                          }`}
+                        >
+                          <span className={`mr-2 text-xs ${
+                            location.pathname === app.path ? 'text-reset-black' : 'text-reset-neon'
+                          }`}>
+                            {app.icon}
+                          </span>
+                          {app.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* User Info & Logout */}
@@ -81,25 +155,48 @@ export default function Layout({ user, onLogout, children }) {
           </div>
 
           {/* Mobile Navigation */}
-          <div className="md:hidden flex items-center space-x-2 pb-4 overflow-x-auto">
-            {visibleNav.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center px-3 py-2 rounded-reset-sm font-body font-semibold text-xs uppercase tracking-wide whitespace-nowrap transition-all duration-200 ${
-                  location.pathname === item.path
-                    ? 'bg-reset-neon text-reset-black'
-                    : 'text-reset-white hover:bg-reset-gray-dark hover:text-reset-neon border border-reset-gray-medium'
-                }`}
-              >
-                <span className={`mr-1.5 text-xs ${
-                  location.pathname === item.path ? 'text-reset-black' : 'text-reset-neon'
-                }`}>
-                  {item.icon}
-                </span>
-                {item.name}
-              </Link>
-            ))}
+          <div className="md:hidden pb-4">
+            <div className="flex items-center space-x-2 overflow-x-auto">
+              {/* Navegación principal móvil */}
+              {visibleMainNav.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center px-3 py-2 rounded-reset-sm font-body font-semibold text-xs uppercase tracking-wide whitespace-nowrap transition-all duration-200 ${
+                    location.pathname === item.path
+                      ? 'bg-reset-neon text-reset-black'
+                      : 'text-reset-white hover:bg-reset-gray-dark hover:text-reset-neon border border-reset-gray-medium'
+                  }`}
+                >
+                  <span className={`mr-1.5 text-xs ${
+                    location.pathname === item.path ? 'text-reset-black' : 'text-reset-neon'
+                  }`}>
+                    {item.icon}
+                  </span>
+                  {item.name}
+                </Link>
+              ))}
+
+              {/* Apps individuales en móvil (sin dropdown para mejor UX) */}
+              {visibleApps.map((app) => (
+                <Link
+                  key={app.path}
+                  to={app.path}
+                  className={`flex items-center px-3 py-2 rounded-reset-sm font-body font-semibold text-xs uppercase tracking-wide whitespace-nowrap transition-all duration-200 ${
+                    location.pathname === app.path
+                      ? 'bg-reset-neon text-reset-black'
+                      : 'text-reset-white hover:bg-reset-gray-dark hover:text-reset-neon border border-reset-gray-medium'
+                  }`}
+                >
+                  <span className={`mr-1.5 text-xs ${
+                    location.pathname === app.path ? 'text-reset-black' : 'text-reset-neon'
+                  }`}>
+                    {app.icon}
+                  </span>
+                  {app.name}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </nav>
