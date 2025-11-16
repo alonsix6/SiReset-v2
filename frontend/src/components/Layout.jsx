@@ -6,11 +6,11 @@ export default function Layout({ user, onLogout, children }) {
   const [isAppsDropdownOpen, setIsAppsDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
 
-  // Apps disponibles
+  // Apps disponibles - TODAS visibles para todos los usuarios
   const apps = [
-    { name: 'Mougli', path: '/mougli', icon: '▶', module: 'Mougli' },
-    { name: 'Mapito', path: '/mapito', icon: '▶', module: 'Mapito' },
-    { name: 'The Box', path: '/thebox', icon: '▶', module: 'TheBox' },
+    { name: 'Mougli', path: '/mougli', icon: '▶' },
+    { name: 'Mapito', path: '/mapito', icon: '▶' },
+    { name: 'The Box', path: '/thebox', icon: '▶' },
   ]
 
   // Navegación principal (Dashboard y Admin)
@@ -19,12 +19,10 @@ export default function Layout({ user, onLogout, children }) {
     { name: 'Admin', path: '/admin', icon: '▶', adminOnly: true },
   ]
 
-  // Filtrar apps según permisos del usuario
-  const visibleApps = apps.filter(app =>
-    user.role === 'admin' || user.modules.includes(app.module)
-  )
+  // Todas las apps son visibles para todos los usuarios
+  const visibleApps = apps
 
-  // Filtrar navegación principal
+  // Filtrar navegación principal (solo Admin requiere permisos)
   const visibleMainNav = mainNavigation.filter(item => {
     if (item.adminOnly) {
       return user.role === 'admin'
