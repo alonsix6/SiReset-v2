@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Mougli from './pages/Mougli'
 import Mapito from './pages/Mapito'
 import TheBox from './pages/TheBox'
+import AfiniMap from './pages/AfiniMap'
 import Admin from './pages/Admin'
 import Layout from './components/Layout'
 
@@ -77,7 +78,7 @@ function App() {
                 session.user.email,
           role: session.user.user_metadata?.role || 'user',
           active: true,
-          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox']
+          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox', 'AfiniMap']
         }
         setUser(userData)
         localStorage.setItem('token', session.access_token)
@@ -99,7 +100,7 @@ function App() {
                 session.user.email,
           role: session.user.user_metadata?.role || 'user',
           active: true,
-          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox']
+          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox', 'AfiniMap']
         }
         setUser(userData)
         localStorage.setItem('token', session.access_token)
@@ -171,6 +172,11 @@ function App() {
       <Route path="/thebox" element={
         <Layout user={user} onLogout={handleLogout}>
           <TheBox user={user} />
+        </Layout>
+      } />
+      <Route path="/afinimap" element={
+        <Layout user={user} onLogout={handleLogout}>
+          <AfiniMap user={user} />
         </Layout>
       } />
       <Route path="/admin" element={
