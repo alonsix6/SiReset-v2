@@ -64,11 +64,12 @@ async def procesar_monitor(
     # 2. Leer contenido y validar tamaño
     try:
         content = await monitor.read()
+        logger.info(f"✅ Archivo leído exitosamente: {len(content)} bytes")
     except Exception as e:
-        logger.error(f"Error leyendo archivo: {e}")
+        logger.error(f"❌ Error leyendo archivo: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Error leyendo archivo"
+            detail=f"Error leyendo archivo: {str(e)}"
         )
 
     size_mb = len(content) / (1024 * 1024)
@@ -103,18 +104,21 @@ async def procesar_monitor(
 
     # 4. Procesar archivo
     try:
+        logger.info("🔄 Iniciando procesamiento de Monitor...")
         excel_output = procesar_monitor_txt(file_content)
-        logger.info("Procesamiento completado exitosamente")
+        logger.info("✅ Procesamiento completado exitosamente")
 
     except ValueError as e:
-        logger.error(f"Error de validación: {e}")
+        logger.error(f"❌ Error de validación: {e}", exc_info=True)
         raise HTTPException(
             status_code=400,
             detail=f"Archivo inválido: {str(e)}"
         )
 
     except Exception as e:
-        logger.error(f"Error procesando Monitor: {e}", exc_info=True)
+        logger.error(f"❌ Error procesando Monitor: {e}", exc_info=True)
+        logger.error(f"   Tipo de error: {type(e).__name__}")
+        logger.error(f"   Args: {e.args}")
         raise HTTPException(
             status_code=500,
             detail=f"Error interno al procesar archivo: {str(e)}"
@@ -168,11 +172,12 @@ async def procesar_outview(
     # 2. Leer contenido y validar tamaño
     try:
         content = await outview.read()
+        logger.info(f"✅ Archivo leído exitosamente: {len(content)} bytes")
     except Exception as e:
-        logger.error(f"Error leyendo archivo: {e}")
+        logger.error(f"❌ Error leyendo archivo: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Error leyendo archivo"
+            detail=f"Error leyendo archivo: {str(e)}"
         )
 
     size_mb = len(content) / (1024 * 1024)
@@ -188,18 +193,21 @@ async def procesar_outview(
 
     # 3. Procesar archivo
     try:
+        logger.info("🔄 Iniciando procesamiento de OutView...")
         excel_output = procesar_outview_excel(content)
-        logger.info("Procesamiento completado exitosamente")
+        logger.info("✅ Procesamiento completado exitosamente")
 
     except ValueError as e:
-        logger.error(f"Error de validación: {e}")
+        logger.error(f"❌ Error de validación: {e}", exc_info=True)
         raise HTTPException(
             status_code=400,
             detail=f"Archivo inválido: {str(e)}"
         )
 
     except Exception as e:
-        logger.error(f"Error procesando OutView: {e}", exc_info=True)
+        logger.error(f"❌ Error procesando OutView: {e}", exc_info=True)
+        logger.error(f"   Tipo de error: {type(e).__name__}")
+        logger.error(f"   Args: {e.args}")
         raise HTTPException(
             status_code=500,
             detail=f"Error interno al procesar archivo: {str(e)}"
@@ -276,11 +284,12 @@ async def procesar_consolidado(
         # Leer contenido
         try:
             content = await monitor.read()
+            logger.info(f"✅ Monitor leído exitosamente: {len(content)} bytes")
         except Exception as e:
-            logger.error(f"Error leyendo Monitor: {e}")
+            logger.error(f"❌ Error leyendo Monitor: {e}", exc_info=True)
             raise HTTPException(
                 status_code=500,
-                detail="Error leyendo archivo Monitor"
+                detail=f"Error leyendo archivo Monitor: {str(e)}"
             )
 
         # Validar tamaño
@@ -351,11 +360,12 @@ async def procesar_consolidado(
         # Leer contenido
         try:
             content = await outview.read()
+            logger.info(f"✅ OutView leído exitosamente: {len(content)} bytes")
         except Exception as e:
-            logger.error(f"Error leyendo OutView: {e}")
+            logger.error(f"❌ Error leyendo OutView: {e}", exc_info=True)
             raise HTTPException(
                 status_code=500,
-                detail="Error leyendo archivo OutView"
+                detail=f"Error leyendo archivo OutView: {str(e)}"
             )
 
         # Validar tamaño
@@ -394,14 +404,17 @@ async def procesar_consolidado(
     # ==========================================
 
     try:
+        logger.info("🔄 Generando Excel consolidado...")
         excel_output = generar_excel_mougli_completo(
             df_monitor=df_monitor,
             df_outview=df_outview
         )
-        logger.info("Excel consolidado generado exitosamente")
+        logger.info("✅ Excel consolidado generado exitosamente")
 
     except Exception as e:
-        logger.error(f"Error generando Excel consolidado: {e}", exc_info=True)
+        logger.error(f"❌ Error generando Excel consolidado: {e}", exc_info=True)
+        logger.error(f"   Tipo de error: {type(e).__name__}")
+        logger.error(f"   Args: {e.args}")
         raise HTTPException(
             status_code=500,
             detail=f"Error generando Excel: {str(e)}"

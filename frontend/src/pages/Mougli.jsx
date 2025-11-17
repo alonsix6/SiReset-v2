@@ -79,6 +79,19 @@ export default function Mougli({ user }) {
       const formData = new FormData()
       formData.append('monitor', monitorFile)
 
+      // 🔍 DEBUGGING: Log detalles del archivo y petición
+      console.group('📤 [MOUGLI DEBUG] Procesando Monitor')
+      console.log('📄 Archivo:', {
+        nombre: monitorFile.name,
+        tamaño: `${(monitorFile.size / 1024).toFixed(2)} KB`,
+        tipo: monitorFile.type,
+        ultimaMod: monitorFile.lastModified
+      })
+      console.log('🔑 Token presente:', !!token)
+      console.log('🌐 URL:', window.location.origin + '/api/mougli/procesar-monitor')
+      console.log('📦 FormData keys:', Array.from(formData.keys()))
+      console.groupEnd()
+
       const response = await axios.post(
         '/api/mougli/procesar-monitor',
         formData,
@@ -107,11 +120,39 @@ export default function Mougli({ user }) {
       document.getElementById('monitor-input').value = ''
 
     } catch (err) {
-      console.error('Error procesando Monitor:', err)
+      // 🔍 DEBUGGING: Log detallado del error
+      console.group('❌ [MOUGLI DEBUG] Error procesando Monitor')
+      console.error('Error completo:', err)
+      console.log('📊 Detalles del error:', {
+        mensaje: err.message,
+        código: err.code,
+        name: err.name,
+        stack: err.stack?.substring(0, 200)
+      })
+
+      if (err.response) {
+        console.log('📡 Respuesta del servidor:', {
+          status: err.response.status,
+          statusText: err.response.statusText,
+          headers: err.response.headers,
+          url: err.response.config?.url,
+          method: err.response.config?.method
+        })
+      } else if (err.request) {
+        console.log('📡 Request enviado pero sin respuesta:', {
+          readyState: err.request.readyState,
+          status: err.request.status,
+          responseURL: err.request.responseURL
+        })
+      } else {
+        console.log('⚠️ Error antes de enviar request')
+      }
+      console.groupEnd()
 
       if (err.response?.data instanceof Blob) {
         // Convertir Blob a texto para leer el mensaje de error
         const text = await err.response.data.text()
+        console.log('📄 [MOUGLI DEBUG] Error del servidor (texto):', text)
         try {
           const errorData = JSON.parse(text)
           setErrorMonitor(errorData.detail || 'Error procesando archivo')
@@ -141,6 +182,19 @@ export default function Mougli({ user }) {
       const formData = new FormData()
       formData.append('outview', outviewFile)
 
+      // 🔍 DEBUGGING: Log detalles del archivo y petición
+      console.group('📤 [MOUGLI DEBUG] Procesando OutView')
+      console.log('📄 Archivo:', {
+        nombre: outviewFile.name,
+        tamaño: `${(outviewFile.size / 1024).toFixed(2)} KB`,
+        tipo: outviewFile.type,
+        ultimaMod: outviewFile.lastModified
+      })
+      console.log('🔑 Token presente:', !!token)
+      console.log('🌐 URL:', window.location.origin + '/api/mougli/procesar-outview')
+      console.log('📦 FormData keys:', Array.from(formData.keys()))
+      console.groupEnd()
+
       const response = await axios.post(
         '/api/mougli/procesar-outview',
         formData,
@@ -169,11 +223,39 @@ export default function Mougli({ user }) {
       document.getElementById('outview-input').value = ''
 
     } catch (err) {
-      console.error('Error procesando OutView:', err)
+      // 🔍 DEBUGGING: Log detallado del error
+      console.group('❌ [MOUGLI DEBUG] Error procesando OutView')
+      console.error('Error completo:', err)
+      console.log('📊 Detalles del error:', {
+        mensaje: err.message,
+        código: err.code,
+        name: err.name,
+        stack: err.stack?.substring(0, 200)
+      })
+
+      if (err.response) {
+        console.log('📡 Respuesta del servidor:', {
+          status: err.response.status,
+          statusText: err.response.statusText,
+          headers: err.response.headers,
+          url: err.response.config?.url,
+          method: err.response.config?.method
+        })
+      } else if (err.request) {
+        console.log('📡 Request enviado pero sin respuesta:', {
+          readyState: err.request.readyState,
+          status: err.request.status,
+          responseURL: err.request.responseURL
+        })
+      } else {
+        console.log('⚠️ Error antes de enviar request')
+      }
+      console.groupEnd()
 
       if (err.response?.data instanceof Blob) {
         // Convertir Blob a texto para leer el mensaje de error
         const text = await err.response.data.text()
+        console.log('📄 [MOUGLI DEBUG] Error del servidor (texto):', text)
         try {
           const errorData = JSON.parse(text)
           setErrorOutview(errorData.detail || 'Error procesando archivo')
@@ -253,6 +335,27 @@ export default function Mougli({ user }) {
         formData.append('outview', outviewFileConsolidado)
       }
 
+      // 🔍 DEBUGGING: Log detalles de los archivos y petición
+      console.group('📤 [MOUGLI DEBUG] Procesando Consolidado')
+      if (monitorFileConsolidado) {
+        console.log('📄 Monitor:', {
+          nombre: monitorFileConsolidado.name,
+          tamaño: `${(monitorFileConsolidado.size / 1024).toFixed(2)} KB`,
+          tipo: monitorFileConsolidado.type
+        })
+      }
+      if (outviewFileConsolidado) {
+        console.log('📄 OutView:', {
+          nombre: outviewFileConsolidado.name,
+          tamaño: `${(outviewFileConsolidado.size / 1024).toFixed(2)} KB`,
+          tipo: outviewFileConsolidado.type
+        })
+      }
+      console.log('🔑 Token presente:', !!token)
+      console.log('🌐 URL:', window.location.origin + '/api/mougli/procesar-consolidado')
+      console.log('📦 FormData keys:', Array.from(formData.keys()))
+      console.groupEnd()
+
       const response = await axios.post(
         '/api/mougli/procesar-consolidado',
         formData,
@@ -295,10 +398,38 @@ export default function Mougli({ user }) {
       if (outviewInput) outviewInput.value = ''
 
     } catch (err) {
-      console.error('Error procesando Consolidado:', err)
+      // 🔍 DEBUGGING: Log detallado del error
+      console.group('❌ [MOUGLI DEBUG] Error procesando Consolidado')
+      console.error('Error completo:', err)
+      console.log('📊 Detalles del error:', {
+        mensaje: err.message,
+        código: err.code,
+        name: err.name,
+        stack: err.stack?.substring(0, 200)
+      })
+
+      if (err.response) {
+        console.log('📡 Respuesta del servidor:', {
+          status: err.response.status,
+          statusText: err.response.statusText,
+          headers: err.response.headers,
+          url: err.response.config?.url,
+          method: err.response.config?.method
+        })
+      } else if (err.request) {
+        console.log('📡 Request enviado pero sin respuesta:', {
+          readyState: err.request.readyState,
+          status: err.request.status,
+          responseURL: err.request.responseURL
+        })
+      } else {
+        console.log('⚠️ Error antes de enviar request')
+      }
+      console.groupEnd()
 
       if (err.response?.data instanceof Blob) {
         const text = await err.response.data.text()
+        console.log('📄 [MOUGLI DEBUG] Error del servidor (texto):', text)
         try {
           const errorData = JSON.parse(text)
           setErrorConsolidado(errorData.detail || 'Error procesando archivos')
