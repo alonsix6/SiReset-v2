@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import { Upload, Download, Loader, AlertCircle, CheckCircle, FileSpreadsheet } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// En producción (Cloud Run), frontend y backend están en el mismo servidor
+// Usar URL relativa vacía para que las llamadas vayan al mismo dominio
+// En desarrollo local, usar localhost:8080
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '' : 'http://localhost:8080')
 
 export default function AfiniMap({ user }) {
   // Estados principales
