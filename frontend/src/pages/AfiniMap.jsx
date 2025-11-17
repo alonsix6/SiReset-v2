@@ -1,32 +1,35 @@
-import { useState, useEffect } from 'react'
-import { Upload, Download, Loader, AlertCircle, CheckCircle, FileSpreadsheet } from 'lucide-react'
+import { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
+import { toPng } from 'html-to-image'
+import { Download, Loader, Upload, FileSpreadsheet, X } from 'lucide-react'
 
-// En producción (Cloud Run), frontend y backend están en el mismo servidor
-// Usar URL relativa vacía para que las llamadas vayan al mismo dominio
-// En desarrollo local, usar localhost:8080
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '' : 'http://localhost:8080')
+import AfiniMapChart from '../components/AfiniMap/AfiniMapChart'
+import AfiniMapControls from '../components/AfiniMap/AfiniMapControls'
+import VariableSelector from '../components/AfiniMap/VariableSelector'
 
 export default function AfiniMap({ user }) {
   // Estados principales
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [fileName, setFileName] = useState('')
-
-  // Datos del Excel procesado
   const [targetName, setTargetName] = useState('')
   const [variables, setVariables] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [exporting, setExporting] = useState(false)
 
-  // Imagen del gráfico
-  const [graficoUrl, setGraficoUrl] = useState('')
-  const [generandoGrafico, setGenerandoGrafico] = useState(false)
-
-  // Configuración
+  // Estados de configuración
   const [topN, setTopN] = useState(10)
   const [ordenarPor, setOrdenarPor] = useState('consumo') // 'consumo' | 'afinidad'
   const [lineaAfinidad, setLineaAfinidad] = useState(110)
   const [colorBurbujas, setColorBurbujas] = useState('#cf3b4d')
   const [colorFondo, setColorFondo] = useState('#fff2f4')
+  const [highlightedVariable, setHighlightedVariable] = useState('')
+  const [highlightColor, setHighlightColor] = useState('#FF0080')
+  const [colorTexto, setColorTexto] = useState('#FFFFFF')
+  const [colorEjeX, setColorEjeX] = useState('#AAAAAA')
+  const [colorEjeY, setColorEjeY] = useState('#AAAAAA')
+
+  // Ref para exportar
+  const chartRef = useRef(null)
 
   // ========== PROCESAMIENTO EXCEL (EN FRONTEND - COMO THE BOX) ==========
 
@@ -35,35 +38,41 @@ export default function AfiniMap({ user }) {
     setError('')
 
     try {
-      // 1. Extraer target de Fila 5 (índice 4), Columna D (índice 3)
-      const target = jsonData[4]?.[3] || 'Target no especificado'
+      // Extraer target de D5 (row 4, col 3)
+      const target = jsonData[4]?.[3]
+      if (!target) {
+        setError('No se encontró el nombre del Target en celda D5. Verifica la estructura del archivo TGI.')
+        setLoading(false)
+        return
+      }
       setTargetName(String(target).trim())
 
       const extractedVariables = []
 
-      // 2. Procesar desde fila 8 (índice 7)
+      // Procesar desde fila 8 en adelante (índice 7 en array)
       for (let i = 7; i < jsonData.length; i++) {
         const row = jsonData[i]
-        const tipoMetrica = row[1] // Columna B
 
-        // Verificar si es una fila "Vert%"
-        if (tipoMetrica === 'Vert%') {
-          // Verificar que la siguiente fila sea "Afinidad"
+        // Verificar si columna B dice "Vert%"
+        if (row[1] === 'Vert%') {
+          // Variable nombre está en columna A
+          const nombre = row[0]
+
+          // Consumo (Vert%) está en columna D
+          let consumoRaw = row[3]
+          let consumo = 0
+
+          // Convertir a número si es necesario
+          if (typeof consumoRaw === 'number') {
+            consumo = consumoRaw
+          } else if (typeof consumoRaw === 'string') {
+            consumo = parseFloat(consumoRaw)
+          }
+
+          // La siguiente fila debe tener "Afinidad" en columna B
           const nextRow = jsonData[i + 1]
           if (nextRow && nextRow[1] === 'Afinidad') {
-            const nombre = row[0] || ''  // Columna A
-            const consumoRaw = row[3]    // Columna D
-            const afinidadRaw = nextRow[3] // Columna D de siguiente fila
-
-            // Convertir consumo (puede ser "48.1%" o 0.481)
-            let consumo = 0
-            if (typeof consumoRaw === 'string' && consumoRaw.includes('%')) {
-              consumo = parseFloat(consumoRaw.replace('%', '')) / 100
-            } else if (typeof consumoRaw === 'number') {
-              consumo = consumoRaw
-            } else if (typeof consumoRaw === 'string') {
-              consumo = parseFloat(consumoRaw)
-            }
+            const afinidadRaw = nextRow[3] // Columna D
 
             // Convertir afinidad
             const afinidad = parseFloat(afinidadRaw)
@@ -74,11 +83,12 @@ export default function AfiniMap({ user }) {
                 nombre: String(nombre).trim(),
                 consumo: consumo,
                 afinidad: afinidad,
+                tamano: consumo * 10, // Tamaño proporcional al consumo
                 visible: true
               })
             }
 
-            i++  // Saltar la fila de Afinidad ya procesada
+            i++ // Saltar la fila de Afinidad ya procesada
           }
         }
       }
@@ -89,14 +99,22 @@ export default function AfiniMap({ user }) {
         return
       }
 
-      setVariables(extractedVariables)
+      // Normalizar tamaños
+      const tamanos = extractedVariables.map(v => v.tamano)
+      const minTamano = Math.min(...tamanos)
+      const maxTamano = Math.max(...tamanos)
+
+      const variablesNormalizadas = extractedVariables.map(variable => ({
+        ...variable,
+        tamano: ((variable.tamano - minTamano) / (maxTamano - minTamano)) * 1000 + 200
+      }))
+
+      // Ordenar alfabéticamente
+      variablesNormalizadas.sort((a, b) => a.nombre.localeCompare(b.nombre))
+
+      setVariables(variablesNormalizadas)
+      setTopN(Math.min(10, variablesNormalizadas.length))
       setLoading(false)
-
-      // Generar gráfico inicial
-      setTimeout(() => {
-        actualizarGrafico(extractedVariables)
-      }, 100)
-
     } catch (err) {
       console.error('Error procesando Excel:', err)
       setError(`Error procesando el archivo: ${err.message}`)
@@ -131,7 +149,6 @@ export default function AfiniMap({ user }) {
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null })
 
         processExcelData(jsonData)
-
       } catch (err) {
         console.error('Error leyendo Excel:', err)
         setError('Error leyendo el archivo Excel. Verifica que sea un formato válido.')
@@ -140,7 +157,7 @@ export default function AfiniMap({ user }) {
     }
 
     reader.onerror = () => {
-      setError('Error leyendo el archivo')
+      setError('Error al leer el archivo')
       setLoading(false)
     }
 
@@ -149,10 +166,69 @@ export default function AfiniMap({ user }) {
 
   const handleClearFile = () => {
     setFileName('')
-    setVariables([])
     setTargetName('')
-    setGraficoUrl('')
+    setVariables([])
     setError('')
+    setHighlightedVariable('')
+  }
+
+  const handleToggleVariable = (nombreVariable) => {
+    const updatedVariables = variables.map(variable =>
+      variable.nombre === nombreVariable
+        ? { ...variable, visible: !variable.visible }
+        : variable
+    )
+    setVariables(updatedVariables)
+
+    // Si la variable resaltada se oculta, limpiar resalte
+    if (highlightedVariable === nombreVariable) {
+      const variable = updatedVariables.find(v => v.nombre === nombreVariable)
+      if (!variable.visible) {
+        setHighlightedVariable('')
+      }
+    }
+  }
+
+  const handleToggleAll = () => {
+    const allVisible = variables.every(v => v.visible)
+    const updatedVariables = variables.map(variable => ({
+      ...variable,
+      visible: !allVisible
+    }))
+    setVariables(updatedVariables)
+
+    if (!allVisible === false) {
+      setHighlightedVariable('')
+    }
+  }
+
+  const handleExport = async () => {
+    if (!chartRef.current) return
+
+    setExporting(true)
+
+    try {
+      // Esperar un momento para que el gráfico se renderice completamente
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      const dataUrl = await toPng(chartRef.current, {
+        backgroundColor: colorFondo,
+        pixelRatio: 3,
+        quality: 1
+      })
+
+      // Descargar imagen
+      const link = document.createElement('a')
+      link.download = `afinimap-${targetName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`
+      link.href = dataUrl
+      link.click()
+
+      setExporting(false)
+    } catch (err) {
+      console.error('Error exportando imagen:', err)
+      setError('Error al exportar la imagen')
+      setExporting(false)
+    }
   }
 
   // ========== COMPUTED VALUES ==========
@@ -174,133 +250,23 @@ export default function AfiniMap({ user }) {
     return vars.slice(0, limit)
   }
 
-  const variablesVisibles = variables.filter(v => v.visible).length
+  const dataParaGrafico = variablesOrdenadas()
 
-  // ========== GENERACIÓN DE GRÁFICO ==========
-
-  const actualizarGrafico = async (varsToUse = null) => {
-    const vars = varsToUse || variablesOrdenadas()
-    const visibles = vars.filter(v => v.visible)
-
-    console.log('🎨 actualizarGrafico llamado:', {
-      varsToUse: varsToUse ? varsToUse.length : 'null',
-      vars: vars.length,
-      visibles: visibles.length,
-      targetName
-    })
-
-    if (visibles.length < 2) {
-      console.log('⚠️ Menos de 2 variables visibles, no se genera gráfico')
-      setGraficoUrl('')
-      return
-    }
-
-    setGenerandoGrafico(true)
-    setError('')
-
-    try {
-      const config = {
-        variables: visibles,
-        target_name: targetName,
-        linea_afinidad: lineaAfinidad,
-        color_burbujas: colorBurbujas,
-        color_fondo: colorFondo
-      }
-
-      console.log('📤 Enviando request al backend:', API_URL)
-
-      const token = localStorage.getItem('token')
-
-      const response = await fetch(`${API_URL}/api/afinimap/generar-grafico`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })  // Token opcional
-        },
-        body: JSON.stringify(config)
-      })
-
-      console.log('📥 Response status:', response.status, response.statusText)
-
-      if (!response.ok) {
-        throw new Error(`Error generando gráfico: ${response.statusText}`)
-      }
-
-      const blob = await response.blob()
-      console.log('✓ Blob recibido:', blob.size, 'bytes, tipo:', blob.type)
-
-      // Revocar URL anterior si existe
-      if (graficoUrl) {
-        URL.revokeObjectURL(graficoUrl)
-      }
-
-      const newUrl = URL.createObjectURL(blob)
-      console.log('✓ URL del gráfico creada:', newUrl)
-      setGraficoUrl(newUrl)
-
-    } catch (err) {
-      console.error('❌ Error generando gráfico:', err)
-      setError(err.message || 'Error generando el gráfico')
-    } finally {
-      setGenerandoGrafico(false)
-    }
-  }
-
-  const toggleVariable = (index) => {
-    const newVars = [...variables]
-    newVars[index].visible = !newVars[index].visible
-    setVariables(newVars)
-  }
-
-  const toggleTodas = () => {
-    const todasVisibles = variablesVisibles === variables.length
-    const newVars = variables.map(v => ({ ...v, visible: !todasVisibles }))
-    setVariables(newVars)
-  }
-
-  const descargarPNG = () => {
-    if (!graficoUrl) return
-
-    const a = document.createElement('a')
-    a.href = graficoUrl
-    const fecha = new Date().toISOString().split('T')[0]
-    a.download = `afinimap_${targetName}_${fecha}.png`
-    a.click()
-  }
-
-  // Actualizar gráfico cuando cambian los controles
-  useEffect(() => {
-    if (variables.length > 0) {
-      actualizarGrafico()
-    }
-  }, [topN, ordenarPor, lineaAfinidad, colorBurbujas, colorFondo])
-
-  // Actualizar gráfico cuando cambian visibilidad de variables
-  useEffect(() => {
-    if (variables.length > 0) {
-      const timer = setTimeout(() => {
-        actualizarGrafico()
-      }, 300)
-      return () => clearTimeout(timer)
-    }
-  }, [variables])
-
-  // ========== RENDER (estilo The Box) ==========
+  // ========== RENDER ==========
 
   return (
     <div className="section-reset">
       <div className="container-reset max-w-7xl">
-
-        {/* Header - Igual que The Box */}
+        {/* Header */}
         <div className="mb-8 animate-fade-in-up">
           <span className="text-reset-neon text-xs uppercase font-semibold tracking-wider">
-            // HERRAMIENTA DE ANÁLISIS
+            // ANÁLISIS TGI KANTAR IBOPE MEDIA
           </span>
           <h1 className="font-display text-4xl lg:text-6xl text-reset-white mt-2">
-            AFINI<span className="text-gradient-neon">MAP</span>
+            AFINI<span className="text-gradient-magenta">MAP</span>
           </h1>
           <p className="text-reset-gray-light text-lg mt-2">
-            Mapas de afinidad TGI - Scatter plots de consumo y afinidad
+            Mapas de afinidad - Scatter plots de consumo y afinidad
           </p>
         </div>
 
@@ -311,373 +277,164 @@ export default function AfiniMap({ user }) {
           </div>
         )}
 
-        {/* Grid principal - 1 columna sidebar + 3 columnas gráfico */}
+        {/* Grid principal */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-          {/* SIDEBAR - Controles (1 columna) */}
+          {/* Sidebar - Controles */}
           <div className="lg:col-span-1 space-y-4">
-
             {/* Upload */}
-            <div className="card-reset-shadow animate-fade-in-up">
+            <div className="card-reset-shadow animate-fade-in">
               <div className="flex items-center gap-2 mb-4">
                 <FileSpreadsheet className="text-reset-neon" size={20} />
                 <h3 className="text-lg font-display text-reset-white">
-                  Subir Excel TGI
+                  Archivo TGI
                 </h3>
               </div>
 
-              <div className="relative">
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileUpload}
-                  disabled={loading}
-                  className="block w-full text-sm text-reset-white
-                            file:mr-4 file:py-2 file:px-4
-                            file:rounded-lg file:border-0
-                            file:bg-reset-neon file:text-reset-black
-                            file:font-semibold file:uppercase file:text-xs file:tracking-wider
-                            hover:file:bg-opacity-80
-                            file:cursor-pointer
-                            cursor-pointer
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            bg-reset-gray-medium rounded-lg p-2 border border-reset-gray-light/20"
-                />
-              </div>
+              {!fileName ? (
+                <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-reset-gray-light/30 rounded-lg cursor-pointer hover:border-reset-neon/50 hover:bg-reset-gray-dark/30 transition-all">
+                  <Upload className="text-reset-cyan mb-3" size={32} />
+                  <span className="text-sm text-reset-white font-semibold mb-1">
+                    Subir archivo Excel
+                  </span>
+                  <span className="text-xs text-reset-gray-light text-center">
+                    Formato TGI (.xlsx o .xls)
+                  </span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 p-3 bg-reset-gray-dark/50 rounded-lg border border-reset-neon/20">
+                    <FileSpreadsheet className="text-reset-neon flex-shrink-0" size={18} />
+                    <span className="text-sm text-reset-white truncate flex-1">
+                      {fileName}
+                    </span>
+                    <button
+                      onClick={handleClearFile}
+                      className="text-reset-magenta hover:text-reset-white transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
 
-              {fileName && (
-                <div className="mt-3 flex items-center justify-between p-2 bg-reset-gray-dark rounded-lg border border-reset-neon/30">
-                  <span className="text-xs text-reset-neon truncate">{fileName}</span>
-                  <button
-                    onClick={handleClearFile}
-                    className="text-xs text-reset-gray-light hover:text-reset-white ml-2"
-                  >
-                    ✕
-                  </button>
+                  {targetName && (
+                    <div className="p-3 bg-reset-cyan/10 rounded-lg border border-reset-cyan/20">
+                      <span className="text-xs text-reset-cyan uppercase font-semibold">Target:</span>
+                      <p className="text-sm text-reset-white font-semibold mt-1">{targetName}</p>
+                    </div>
+                  )}
+
+                  {variables.length > 0 && (
+                    <div className="p-3 bg-reset-neon/10 rounded-lg border border-reset-neon/20">
+                      <span className="text-xs text-reset-neon uppercase font-semibold">Variables:</span>
+                      <p className="text-sm text-reset-white font-semibold mt-1">
+                        {variables.length} detectadas
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Target detectado */}
-            {targetName && (
-              <div className="card-reset-shadow bg-reset-neon/10 border border-reset-neon animate-fade-in-up">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-reset-neon text-lg">🎯</span>
-                  <h3 className="text-sm font-display text-reset-neon uppercase">
-                    Target Detectado
-                  </h3>
-                </div>
-                <p className="text-reset-white font-semibold">{targetName}</p>
-                <p className="text-xs text-reset-gray-light mt-1">
-                  {variables.length} variables encontradas
-                </p>
-              </div>
-            )}
-
-            {/* Controles de visualización */}
+            {/* Controles */}
             {variables.length > 0 && (
-              <>
-                <div className="card-reset-shadow animate-fade-in-up">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-reset-cyan text-lg">⚙️</span>
-                    <h3 className="text-lg font-display text-reset-white">
-                      Configuración
-                    </h3>
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Top N */}
-                    <div>
-                      <label className="block text-sm font-semibold mb-2 text-reset-cyan">
-                        Mostrar Top N
-                      </label>
-                      <select
-                        value={topN}
-                        onChange={(e) => setTopN(Number(e.target.value))}
-                        className="w-full bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-3 py-2 text-reset-white focus:outline-none focus:border-reset-cyan"
-                      >
-                        <option value={5}>Top 5</option>
-                        <option value={10}>Top 10</option>
-                        <option value={15}>Top 15</option>
-                        <option value={20}>Top 20</option>
-                        <option value={variables.length}>Todas ({variables.length})</option>
-                      </select>
-                    </div>
-
-                    {/* Ordenar */}
-                    <div>
-                      <label className="block text-sm font-semibold mb-2 text-reset-cyan">
-                        Ordenar por
-                      </label>
-                      <select
-                        value={ordenarPor}
-                        onChange={(e) => setOrdenarPor(e.target.value)}
-                        className="w-full bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-3 py-2 text-reset-white focus:outline-none focus:border-reset-cyan"
-                      >
-                        <option value="consumo">Consumo ↓</option>
-                        <option value="afinidad">Afinidad ↓</option>
-                      </select>
-                    </div>
-
-                    {/* Línea afinidad */}
-                    <div>
-                      <label className="block text-sm font-semibold mb-2 text-reset-purple">
-                        Línea de afinidad base
-                      </label>
-                      <input
-                        type="number"
-                        value={lineaAfinidad}
-                        onChange={(e) => setLineaAfinidad(Number(e.target.value))}
-                        className="w-full bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-3 py-2 text-reset-white focus:outline-none focus:border-reset-purple"
-                        min="50"
-                        max="200"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lista de variables */}
-                <div className="card-reset-shadow animate-fade-in-up">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-reset-magenta text-lg">📊</span>
-                      <h3 className="text-lg font-display text-reset-white">
-                        Variables
-                      </h3>
-                    </div>
-                    <span className="text-xs text-reset-magenta font-semibold">
-                      {variablesVisibles} visibles
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={toggleTodas}
-                    className="w-full mb-3 px-3 py-2 bg-reset-gray-dark hover:bg-reset-gray-medium border border-reset-magenta/30 rounded-lg text-sm text-reset-magenta font-semibold transition-all"
-                  >
-                    {variablesVisibles === variables.length ? 'Deseleccionar todas' : 'Seleccionar todas'}
-                  </button>
-
-                  <div className="max-h-80 overflow-y-auto space-y-1">
-                    {variablesOrdenadas().map((v, i) => {
-                      const originalIndex = variables.findIndex(
-                        variable => variable.nombre === v.nombre
-                      )
-                      return (
-                        <label
-                          key={i}
-                          className="flex items-start gap-2 p-2 hover:bg-reset-gray-medium rounded-lg cursor-pointer transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={v.visible}
-                            onChange={() => toggleVariable(originalIndex)}
-                            className="mt-1 accent-reset-neon"
-                          />
-                          <div className="flex-1 text-sm">
-                            <p className="text-reset-white font-medium leading-tight">{v.nombre}</p>
-                            <p className="text-xs text-reset-gray-light">
-                              {(v.consumo * 100).toFixed(1)}% • Aff: {v.afinidad.toFixed(0)}
-                            </p>
-                          </div>
-                        </label>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* Personalización de colores */}
-                <div className="card-reset-shadow animate-fade-in-up">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-reset-purple text-lg">🎨</span>
-                    <h3 className="text-lg font-display text-reset-white">
-                      Estilo
-                    </h3>
-                  </div>
-
-                  <div className="space-y-3">
-                    {/* Color burbujas */}
-                    <div>
-                      <label className="block text-xs text-reset-gray-light mb-1">
-                        Color burbujas
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="color"
-                          value={colorBurbujas}
-                          onChange={(e) => setColorBurbujas(e.target.value)}
-                          className="h-9 w-14 rounded cursor-pointer"
-                        />
-                        <input
-                          type="text"
-                          value={colorBurbujas}
-                          onChange={(e) => setColorBurbujas(e.target.value)}
-                          className="flex-1 bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-2 py-1 text-sm text-reset-white focus:outline-none focus:border-reset-purple"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Color fondo */}
-                    <div>
-                      <label className="block text-xs text-reset-gray-light mb-1">
-                        Color fondo
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="color"
-                          value={colorFondo}
-                          onChange={(e) => setColorFondo(e.target.value)}
-                          className="h-9 w-14 rounded cursor-pointer"
-                        />
-                        <input
-                          type="text"
-                          value={colorFondo}
-                          onChange={(e) => setColorFondo(e.target.value)}
-                          className="flex-1 bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-2 py-1 text-sm text-reset-white focus:outline-none focus:border-reset-purple"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Botón descarga */}
-                <button
-                  onClick={descargarPNG}
-                  disabled={generandoGrafico || !graficoUrl || variablesVisibles < 2}
-                  className="btn-primary w-full animate-fade-in-up flex items-center justify-center gap-2"
-                >
-                  {generandoGrafico ? (
-                    <>
-                      <Loader className="animate-spin" size={18} />
-                      <span>Generando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download size={18} />
-                      <span>Descargar PNG</span>
-                    </>
-                  )}
-                </button>
-              </>
+              <AfiniMapControls
+                colorBurbujas={colorBurbujas}
+                onColorBurbujasChange={setColorBurbujas}
+                colorFondo={colorFondo}
+                onColorFondoChange={setColorFondo}
+                highlightedVariable={highlightedVariable}
+                onHighlightChange={setHighlightedVariable}
+                highlightColor={highlightColor}
+                onHighlightColorChange={setHighlightColor}
+                colorTexto={colorTexto}
+                onColorTextoChange={setColorTexto}
+                colorEjeX={colorEjeX}
+                onColorEjeXChange={setColorEjeX}
+                colorEjeY={colorEjeY}
+                onColorEjeYChange={setColorEjeY}
+                lineaAfinidad={lineaAfinidad}
+                onLineaAfinidadChange={setLineaAfinidad}
+                topN={topN}
+                onTopNChange={setTopN}
+                ordenarPor={ordenarPor}
+                onOrdenarPorChange={setOrdenarPor}
+                variables={dataParaGrafico}
+                disabled={loading}
+              />
             )}
           </div>
 
-          {/* MAIN - Gráfico (3 columnas) */}
-          <div className="lg:col-span-3">
-            <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-
-              {/* Loading */}
-              {loading ? (
-                <div className="flex items-center justify-center h-[600px]">
-                  <div className="text-center">
-                    <Loader className="animate-spin text-reset-neon mx-auto mb-4" size={48} />
-                    <p className="text-reset-white text-lg font-semibold">
-                      Procesando archivo TGI...
-                    </p>
-                    <p className="text-reset-gray-light text-sm mt-2">
-                      Extrayendo variables de consumo y afinidad
-                    </p>
-                  </div>
+          {/* Main Content - Gráfico */}
+          <div className="lg:col-span-3 space-y-4">
+            {loading ? (
+              <div className="card-reset-shadow flex items-center justify-center min-h-[600px]">
+                <div className="text-center">
+                  <Loader className="animate-spin text-reset-cyan mx-auto mb-4" size={48} />
+                  <p className="text-reset-white font-semibold">Procesando Excel...</p>
+                </div>
+              </div>
+            ) : variables.length > 0 ? (
+              <>
+                {/* Gráfico */}
+                <div className="card-reset-shadow animate-fade-in">
+                  <AfiniMapChart
+                    ref={chartRef}
+                    data={dataParaGrafico}
+                    targetName={targetName}
+                    colorBurbujas={colorBurbujas}
+                    highlightedVariable={highlightedVariable}
+                    highlightColor={highlightColor}
+                    colorTexto={colorTexto}
+                    colorEjeX={colorEjeX}
+                    colorEjeY={colorEjeY}
+                    lineaAfinidad={lineaAfinidad}
+                    colorFondo={colorFondo}
+                  />
                 </div>
 
-              /* Estado inicial */
-              ) : variables.length === 0 ? (
-                <div className="flex items-center justify-center h-[600px] text-reset-gray-light">
-                  <div className="text-center max-w-md">
-                    <div className="text-6xl mb-4">📊</div>
-                    <h3 className="text-xl font-display text-reset-white mb-2">
-                      Comienza cargando tus datos TGI
-                    </h3>
-                    <p className="text-sm mb-6">
-                      Sube un archivo Excel TGI de Kantar Ibope Media para generar el mapa de afinidad
-                    </p>
-
-                    {/* Requisitos del archivo */}
-                    <div className="p-4 bg-reset-gray-dark rounded-lg border border-reset-cyan/30 text-left">
-                      <p className="text-xs text-reset-cyan font-semibold mb-2 uppercase tracking-wider">
-                        📋 Estructura del Excel TGI:
-                      </p>
-                      <ul className="text-xs space-y-1 text-reset-gray-light">
-                        <li>• <strong>Formato:</strong> .xlsx o .xls</li>
-                        <li>• <strong>Hoja:</strong> Cualquier nombre (se lee la primera hoja activa)</li>
-                        <li>• <strong>Fila 5, Columna D:</strong> Nombre del target</li>
-                        <li>• <strong>Desde fila 8:</strong> Pares de filas con Vert% y Afinidad</li>
-                        <li className="pt-2 text-reset-neon">
-                          • Cada variable ocupa 2 filas:
-                          <br />
-                          &nbsp;&nbsp;→ Fila N: [Nombre] | "Vert%" | Consumo%
-                          <br />
-                          &nbsp;&nbsp;→ Fila N+1: [vacío] | "Afinidad" | Índice
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
+                {/* Botón Export */}
+                <div className="flex justify-center animate-fade-in-up">
+                  <button
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className="btn-primary-large group"
+                  >
+                    {exporting ? (
+                      <>
+                        <Loader className="animate-spin" size={20} />
+                        <span>Exportando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download size={20} />
+                        <span>Descargar PNG (300 DPI)</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
-              /* Gráfico */
-              ) : (
-                <>
-                  {graficoUrl && !generandoGrafico ? (
-                    <img
-                      src={graficoUrl}
-                      alt="AfiniMap"
-                      className="w-full h-auto rounded-lg"
-                    />
-                  ) : generandoGrafico ? (
-                    <div className="flex items-center justify-center h-[600px]">
-                      <div className="text-center">
-                        <Loader className="animate-spin text-reset-neon mx-auto mb-4" size={48} />
-                        <p className="text-reset-white text-lg font-semibold">
-                          Generando gráfico...
-                        </p>
-                        <p className="text-reset-gray-light text-sm mt-2">
-                          {variablesVisibles} variables • {targetName}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-[600px] text-reset-gray-light">
-                      <div className="text-center">
-                        <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p>Selecciona al menos 2 variables para generar el gráfico</p>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Info adicional */}
-            {variables.length > 0 && (
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="card-reset bg-reset-gray-dark/50 border border-reset-neon/20 animate-fade-in">
-                  <div className="text-center">
-                    <p className="text-reset-neon text-3xl font-display">
-                      {variablesVisibles}
-                    </p>
-                    <p className="text-reset-gray-light text-sm mt-1">
-                      Variables visibles
-                    </p>
-                  </div>
-                </div>
-                <div className="card-reset bg-reset-gray-dark/50 border border-reset-cyan/20 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                  <div className="text-center">
-                    <p className="text-reset-cyan text-3xl font-display">
-                      {variables.length}
-                    </p>
-                    <p className="text-reset-gray-light text-sm mt-1">
-                      Total detectadas
-                    </p>
-                  </div>
-                </div>
-                <div className="card-reset bg-reset-gray-dark/50 border border-reset-purple/20 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                  <div className="text-center">
-                    <p className="text-reset-purple text-3xl font-display">
-                      {targetName.substring(0, 12)}{targetName.length > 12 ? '...' : ''}
-                    </p>
-                    <p className="text-reset-gray-light text-sm mt-1">
-                      Target
-                    </p>
-                  </div>
+                {/* Selector de Variables */}
+                <VariableSelector
+                  variables={dataParaGrafico}
+                  onToggleVariable={handleToggleVariable}
+                  onToggleAll={handleToggleAll}
+                />
+              </>
+            ) : (
+              <div className="card-reset-shadow flex items-center justify-center min-h-[600px]">
+                <div className="text-center text-reset-gray-light">
+                  <FileSpreadsheet className="mx-auto mb-4 opacity-50" size={64} />
+                  <h3 className="text-xl font-display text-reset-white mb-2">
+                    No hay datos cargados
+                  </h3>
+                  <p className="text-sm">
+                    Sube un archivo Excel TGI para comenzar
+                  </p>
                 </div>
               </div>
             )}
