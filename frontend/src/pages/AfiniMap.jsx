@@ -1,19 +1,17 @@
 import { useState, useEffect } from 'react'
-import { Upload, Download, Loader, AlertCircle, CheckCircle } from 'lucide-react'
+import { Upload, Download, Loader, AlertCircle, CheckCircle, FileSpreadsheet } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 export default function AfiniMap({ user }) {
   // Estados principales
   const [loading, setLoading] = useState(false)
-  const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [fileName, setFileName] = useState('')
 
   // Datos del Excel procesado
   const [targetName, setTargetName] = useState('')
   const [variables, setVariables] = useState([])
-  const [datosListos, setDatosListos] = useState(false)
 
   // Imagen del gráfico
   const [graficoUrl, setGraficoUrl] = useState('')
@@ -65,15 +63,15 @@ export default function AfiniMap({ user }) {
       return
     }
 
+    setFileName(file.name)
     setLoading(true)
     setError('')
-    setSuccess('')
 
     try {
       const formData = new FormData()
       formData.append('excel', file)
 
-      const token = localStorage.getItem('supabase.auth.token')
+      const token = localStorage.getItem('token') // FIX: era 'supabase.auth.token'
 
       const response = await fetch(`${API_URL}/api/afinimap/procesar-excel`, {
         method: 'POST',
@@ -92,8 +90,6 @@ export default function AfiniMap({ user }) {
 
       setTargetName(data.target_name)
       setVariables(data.variables)
-      setDatosListos(true)
-      setSuccess(`¡Excel procesado! ${data.variables.length} variables detectadas para target "${data.target_name}"`)
 
       // Generar gráfico inicial automáticamente
       setTimeout(() => {
@@ -103,10 +99,17 @@ export default function AfiniMap({ user }) {
     } catch (err) {
       console.error('Error subiendo archivo:', err)
       setError(err.message || 'Error procesando el archivo Excel')
-      setDatosListos(false)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleClearFile = () => {
+    setFileName('')
+    setVariables([])
+    setTargetName('')
+    setGraficoUrl('')
+    setError('')
   }
 
   const actualizarGrafico = async (varsToUse = null) => {
@@ -130,7 +133,7 @@ export default function AfiniMap({ user }) {
         color_fondo: colorFondo
       }
 
-      const token = localStorage.getItem('supabase.auth.token')
+      const token = localStorage.getItem('token') // FIX: era 'supabase.auth.token'
 
       const response = await fetch(`${API_URL}/api/afinimap/generar-grafico`, {
         method: 'POST',
@@ -188,14 +191,14 @@ export default function AfiniMap({ user }) {
 
   // Actualizar gráfico cuando cambian los controles
   useEffect(() => {
-    if (datosListos && variables.length > 0) {
+    if (variables.length > 0) {
       actualizarGrafico()
     }
   }, [topN, ordenarPor, lineaAfinidad, colorBurbujas, colorFondo])
 
   // Actualizar gráfico cuando cambian visibilidad de variables
   useEffect(() => {
-    if (datosListos && variables.length > 0) {
+    if (variables.length > 0) {
       const timer = setTimeout(() => {
         actualizarGrafico()
       }, 300)
@@ -203,30 +206,47 @@ export default function AfiniMap({ user }) {
     }
   }, [variables])
 
-  // ========== RENDER ==========
+  // ========== RENDER (estilo The Box) ==========
 
   return (
-    <div className="min-h-screen bg-reset-black text-reset-white">
-      {/* Container principal */}
-      <div className="flex h-screen">
+    <div className="section-reset">
+      <div className="container-reset max-w-7xl">
 
-        {/* SIDEBAR IZQUIERDO */}
-        <aside className="w-96 bg-reset-gray-dark border-r border-reset-gray-medium overflow-y-auto">
-          <div className="p-6 space-y-6">
+        {/* Header - Igual que The Box */}
+        <div className="mb-8 animate-fade-in-up">
+          <span className="text-reset-neon text-xs uppercase font-semibold tracking-wider">
+            // HERRAMIENTA DE ANÁLISIS
+          </span>
+          <h1 className="font-display text-4xl lg:text-6xl text-reset-white mt-2">
+            AFINI<span className="text-gradient-neon">MAP</span>
+          </h1>
+          <p className="text-reset-gray-light text-lg mt-2">
+            Mapas de afinidad TGI - Scatter plots de consumo y afinidad
+          </p>
+        </div>
 
-            {/* Header */}
-            <div>
-              <h1 className="text-2xl font-bold text-gradient-neon mb-2">AfiniMap</h1>
-              <p className="text-sm text-reset-gray-light">
-                Generador de Mapas de Afinidad TGI
-              </p>
-            </div>
+        {/* Alert de error */}
+        {error && (
+          <div className="alert-error mb-6 animate-fade-in">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {/* Grid principal - 1 columna sidebar + 3 columnas gráfico */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+          {/* SIDEBAR - Controles (1 columna) */}
+          <div className="lg:col-span-1 space-y-4">
 
             {/* Upload */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-reset-neon">
-                📁 Subir Excel TGI
-              </label>
+            <div className="card-reset-shadow animate-fade-in-up">
+              <div className="flex items-center gap-2 mb-4">
+                <FileSpreadsheet className="text-reset-neon" size={20} />
+                <h3 className="text-lg font-display text-reset-white">
+                  Subir Excel TGI
+                </h3>
+              </div>
+
               <div className="relative">
                 <input
                   type="file"
@@ -235,112 +255,130 @@ export default function AfiniMap({ user }) {
                   disabled={loading}
                   className="block w-full text-sm text-reset-white
                             file:mr-4 file:py-2 file:px-4
-                            file:rounded-md file:border-0
+                            file:rounded-lg file:border-0
                             file:bg-reset-neon file:text-reset-black
-                            file:font-semibold
+                            file:font-semibold file:uppercase file:text-xs file:tracking-wider
                             hover:file:bg-opacity-80
                             file:cursor-pointer
                             cursor-pointer
                             disabled:opacity-50 disabled:cursor-not-allowed
-                            bg-reset-gray-medium rounded-lg p-2"
+                            bg-reset-gray-medium rounded-lg p-2 border border-reset-gray-light/20"
                 />
               </div>
+
+              {fileName && (
+                <div className="mt-3 flex items-center justify-between p-2 bg-reset-gray-dark rounded-lg border border-reset-neon/30">
+                  <span className="text-xs text-reset-neon truncate">{fileName}</span>
+                  <button
+                    onClick={handleClearFile}
+                    className="text-xs text-reset-gray-light hover:text-reset-white ml-2"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Loading */}
-            {loading && (
-              <div className="text-center py-8">
-                <Loader className="animate-spin h-8 w-8 text-reset-neon mx-auto" />
-                <p className="text-sm text-reset-gray-light mt-2">Procesando Excel...</p>
+            {/* Target detectado */}
+            {targetName && (
+              <div className="card-reset-shadow bg-reset-neon/10 border border-reset-neon animate-fade-in-up">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-reset-neon text-lg">🎯</span>
+                  <h3 className="text-sm font-display text-reset-neon uppercase">
+                    Target Detectado
+                  </h3>
+                </div>
+                <p className="text-reset-white font-semibold">{targetName}</p>
+                <p className="text-xs text-reset-gray-light mt-1">
+                  {variables.length} variables encontradas
+                </p>
               </div>
             )}
 
-            {/* Error */}
-            {error && (
-              <div className="bg-red-900 bg-opacity-20 border border-red-500 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-400">{error}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Success */}
-            {success && (
-              <div className="bg-green-900 bg-opacity-20 border border-green-500 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-green-400">{success}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Configuración (solo si hay datos) */}
-            {datosListos && !loading && (
-              <div className="space-y-6">
-
-                {/* Target detectado */}
-                <div className="bg-reset-neon bg-opacity-10 border border-reset-neon rounded-lg p-3">
-                  <p className="text-sm font-medium text-reset-neon">
-                    🎯 Target: {targetName}
-                  </p>
-                  <p className="text-xs text-reset-gray-light">
-                    {variables.length} variables detectadas
-                  </p>
-                </div>
-
-                {/* Controles */}
-                <div className="space-y-4">
-
-                  {/* Top N */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-reset-cyan">
-                      Mostrar Top N:
-                    </label>
-                    <select
-                      value={topN}
-                      onChange={(e) => setTopN(Number(e.target.value))}
-                      className="w-full bg-reset-gray-medium border border-reset-gray-light rounded-lg px-3 py-2 text-reset-white focus:outline-none focus:border-reset-cyan"
-                    >
-                      <option value={5}>Top 5</option>
-                      <option value={10}>Top 10</option>
-                      <option value={15}>Top 15</option>
-                      <option value={20}>Top 20</option>
-                      <option value={variables.length}>Todas ({variables.length})</option>
-                    </select>
+            {/* Controles de visualización */}
+            {variables.length > 0 && (
+              <>
+                <div className="card-reset-shadow animate-fade-in-up">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-reset-cyan text-lg">⚙️</span>
+                    <h3 className="text-lg font-display text-reset-white">
+                      Configuración
+                    </h3>
                   </div>
 
-                  {/* Ordenar */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-reset-cyan">
-                      Ordenar por:
-                    </label>
-                    <select
-                      value={ordenarPor}
-                      onChange={(e) => setOrdenarPor(e.target.value)}
-                      className="w-full bg-reset-gray-medium border border-reset-gray-light rounded-lg px-3 py-2 text-reset-white focus:outline-none focus:border-reset-cyan"
-                    >
-                      <option value="consumo">Consumo (mayor a menor)</option>
-                      <option value="afinidad">Afinidad (mayor a menor)</option>
-                    </select>
+                  <div className="space-y-4">
+                    {/* Top N */}
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-reset-cyan">
+                        Mostrar Top N
+                      </label>
+                      <select
+                        value={topN}
+                        onChange={(e) => setTopN(Number(e.target.value))}
+                        className="w-full bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-3 py-2 text-reset-white focus:outline-none focus:border-reset-cyan"
+                      >
+                        <option value={5}>Top 5</option>
+                        <option value={10}>Top 10</option>
+                        <option value={15}>Top 15</option>
+                        <option value={20}>Top 20</option>
+                        <option value={variables.length}>Todas ({variables.length})</option>
+                      </select>
+                    </div>
+
+                    {/* Ordenar */}
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-reset-cyan">
+                        Ordenar por
+                      </label>
+                      <select
+                        value={ordenarPor}
+                        onChange={(e) => setOrdenarPor(e.target.value)}
+                        className="w-full bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-3 py-2 text-reset-white focus:outline-none focus:border-reset-cyan"
+                      >
+                        <option value="consumo">Consumo ↓</option>
+                        <option value="afinidad">Afinidad ↓</option>
+                      </select>
+                    </div>
+
+                    {/* Línea afinidad */}
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-reset-purple">
+                        Línea de afinidad base
+                      </label>
+                      <input
+                        type="number"
+                        value={lineaAfinidad}
+                        onChange={(e) => setLineaAfinidad(Number(e.target.value))}
+                        className="w-full bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-3 py-2 text-reset-white focus:outline-none focus:border-reset-purple"
+                        min="50"
+                        max="200"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* Lista de variables */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-reset-magenta">
-                      Variables ({variablesVisibles} visibles)
-                    </label>
-                    <button
-                      onClick={toggleTodas}
-                      className="text-xs text-reset-cyan hover:underline"
-                    >
-                      {variablesVisibles === variables.length ? 'Deseleccionar' : 'Seleccionar'} todas
-                    </button>
+                <div className="card-reset-shadow animate-fade-in-up">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-reset-magenta text-lg">📊</span>
+                      <h3 className="text-lg font-display text-reset-white">
+                        Variables
+                      </h3>
+                    </div>
+                    <span className="text-xs text-reset-magenta font-semibold">
+                      {variablesVisibles} visibles
+                    </span>
                   </div>
 
-                  <div className="border border-reset-gray-medium rounded-lg max-h-64 overflow-y-auto">
+                  <button
+                    onClick={toggleTodas}
+                    className="w-full mb-3 px-3 py-2 bg-reset-gray-dark hover:bg-reset-gray-medium border border-reset-magenta/30 rounded-lg text-sm text-reset-magenta font-semibold transition-all"
+                  >
+                    {variablesVisibles === variables.length ? 'Deseleccionar todas' : 'Seleccionar todas'}
+                  </button>
+
+                  <div className="max-h-80 overflow-y-auto space-y-1">
                     {variablesOrdenadas().map((v, i) => {
                       const originalIndex = variables.findIndex(
                         variable => variable.nombre === v.nombre
@@ -348,18 +386,18 @@ export default function AfiniMap({ user }) {
                       return (
                         <label
                           key={i}
-                          className="flex items-start p-2 hover:bg-reset-gray-medium border-b border-reset-gray-medium last:border-b-0 cursor-pointer"
+                          className="flex items-start gap-2 p-2 hover:bg-reset-gray-medium rounded-lg cursor-pointer transition-colors"
                         >
                           <input
                             type="checkbox"
                             checked={v.visible}
                             onChange={() => toggleVariable(originalIndex)}
-                            className="mt-1 mr-2 accent-reset-neon"
+                            className="mt-1 accent-reset-neon"
                           />
                           <div className="flex-1 text-sm">
-                            <p className="font-medium text-reset-white">{v.nombre}</p>
+                            <p className="text-reset-white font-medium leading-tight">{v.nombre}</p>
                             <p className="text-xs text-reset-gray-light">
-                              {(v.consumo * 100).toFixed(1)}% | Aff: {v.afinidad.toFixed(0)}
+                              {(v.consumo * 100).toFixed(1)}% • Aff: {v.afinidad.toFixed(0)}
                             </p>
                           </div>
                         </label>
@@ -368,64 +406,54 @@ export default function AfiniMap({ user }) {
                   </div>
                 </div>
 
-                {/* Estilo */}
-                <div>
-                  <p className="text-sm font-medium mb-3 text-reset-purple">🎨 Estilo</p>
+                {/* Personalización de colores */}
+                <div className="card-reset-shadow animate-fade-in-up">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-reset-purple text-lg">🎨</span>
+                    <h3 className="text-lg font-display text-reset-white">
+                      Estilo
+                    </h3>
+                  </div>
 
                   <div className="space-y-3">
-                    {/* Línea afinidad */}
-                    <div>
-                      <label className="block text-xs mb-1 text-reset-gray-light">
-                        Línea de afinidad:
-                      </label>
-                      <input
-                        type="number"
-                        value={lineaAfinidad}
-                        onChange={(e) => setLineaAfinidad(Number(e.target.value))}
-                        className="w-full bg-reset-gray-medium border border-reset-gray-light rounded-lg px-2 py-1 text-sm text-reset-white focus:outline-none focus:border-reset-purple"
-                        min="50"
-                        max="200"
-                      />
-                    </div>
-
                     {/* Color burbujas */}
                     <div>
-                      <label className="block text-xs mb-1 text-reset-gray-light">
-                        Color burbujas:
+                      <label className="block text-xs text-reset-gray-light mb-1">
+                        Color burbujas
                       </label>
                       <div className="flex gap-2">
                         <input
                           type="color"
                           value={colorBurbujas}
                           onChange={(e) => setColorBurbujas(e.target.value)}
-                          className="h-8 w-12 rounded cursor-pointer"
+                          className="h-9 w-14 rounded cursor-pointer"
                         />
                         <input
                           type="text"
                           value={colorBurbujas}
                           onChange={(e) => setColorBurbujas(e.target.value)}
-                          className="flex-1 bg-reset-gray-medium border border-reset-gray-light rounded-lg px-2 py-1 text-sm text-reset-white focus:outline-none focus:border-reset-purple"
+                          className="flex-1 bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-2 py-1 text-sm text-reset-white focus:outline-none focus:border-reset-purple"
                         />
                       </div>
                     </div>
 
                     {/* Color fondo */}
                     <div>
-                      <label className="block text-xs mb-1 text-reset-gray-light">
-                        Color fondo:
+                      <label className="block text-xs text-reset-gray-light mb-1">
+                        Color fondo
                       </label>
                       <div className="flex gap-2">
                         <input
                           type="color"
                           value={colorFondo}
                           onChange={(e) => setColorFondo(e.target.value)}
-                          className="h-8 w-12 rounded cursor-pointer"
+                          className="h-9 w-14 rounded cursor-pointer"
                         />
                         <input
                           type="text"
                           value={colorFondo}
                           onChange={(e) => setColorFondo(e.target.value)}
-                          className="flex-1 bg-reset-gray-medium border border-reset-gray-light rounded-lg px-2 py-1 text-sm text-reset-white focus:outline-none focus:border-reset-purple"
+                          className="flex-1 bg-reset-gray-medium border border-reset-gray-light/20 rounded-lg px-2 py-1 text-sm text-reset-white focus:outline-none focus:border-reset-purple"
                         />
                       </div>
                     </div>
@@ -436,67 +464,146 @@ export default function AfiniMap({ user }) {
                 <button
                   onClick={descargarPNG}
                   disabled={generandoGrafico || !graficoUrl || variablesVisibles < 2}
-                  className="w-full bg-gradient-to-r from-reset-neon to-reset-cyan text-reset-black py-3 rounded-lg font-bold
-                            hover:opacity-90 transition-opacity
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            flex items-center justify-center gap-2"
+                  className="btn-primary w-full animate-fade-in-up flex items-center justify-center gap-2"
                 >
                   {generandoGrafico ? (
                     <>
-                      <Loader className="w-5 h-5 animate-spin" />
-                      Generando...
+                      <Loader className="animate-spin" size={18} />
+                      <span>Generando...</span>
                     </>
                   ) : (
                     <>
-                      <Download className="w-5 h-5" />
-                      Descargar PNG
+                      <Download size={18} />
+                      <span>Descargar PNG</span>
                     </>
                   )}
                 </button>
+              </>
+            )}
+          </div>
+
+          {/* MAIN - Gráfico (3 columnas) */}
+          <div className="lg:col-span-3">
+            <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+
+              {/* Loading */}
+              {loading ? (
+                <div className="flex items-center justify-center h-[600px]">
+                  <div className="text-center">
+                    <Loader className="animate-spin text-reset-neon mx-auto mb-4" size={48} />
+                    <p className="text-reset-white text-lg font-semibold">
+                      Procesando archivo TGI...
+                    </p>
+                    <p className="text-reset-gray-light text-sm mt-2">
+                      Extrayendo variables de consumo y afinidad
+                    </p>
+                  </div>
+                </div>
+
+              /* Estado inicial */
+              ) : variables.length === 0 ? (
+                <div className="flex items-center justify-center h-[600px] text-reset-gray-light">
+                  <div className="text-center max-w-md">
+                    <div className="text-6xl mb-4">📊</div>
+                    <h3 className="text-xl font-display text-reset-white mb-2">
+                      Comienza cargando tus datos TGI
+                    </h3>
+                    <p className="text-sm mb-6">
+                      Sube un archivo Excel TGI de Kantar Ibope Media para generar el mapa de afinidad
+                    </p>
+
+                    {/* Requisitos del archivo */}
+                    <div className="p-4 bg-reset-gray-dark rounded-lg border border-reset-cyan/30 text-left">
+                      <p className="text-xs text-reset-cyan font-semibold mb-2 uppercase tracking-wider">
+                        📋 Estructura del Excel TGI:
+                      </p>
+                      <ul className="text-xs space-y-1 text-reset-gray-light">
+                        <li>• <strong>Formato:</strong> .xlsx o .xls</li>
+                        <li>• <strong>Hoja:</strong> Cualquier nombre (se lee la primera hoja activa)</li>
+                        <li>• <strong>Fila 5, Columna D:</strong> Nombre del target</li>
+                        <li>• <strong>Desde fila 8:</strong> Pares de filas con Vert% y Afinidad</li>
+                        <li className="pt-2 text-reset-neon">
+                          • Cada variable ocupa 2 filas:
+                          <br />
+                          &nbsp;&nbsp;→ Fila N: [Nombre] | "Vert%" | Consumo%
+                          <br />
+                          &nbsp;&nbsp;→ Fila N+1: [vacío] | "Afinidad" | Índice
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+              /* Gráfico */
+              ) : (
+                <>
+                  {graficoUrl && !generandoGrafico ? (
+                    <img
+                      src={graficoUrl}
+                      alt="AfiniMap"
+                      className="w-full h-auto rounded-lg"
+                    />
+                  ) : generandoGrafico ? (
+                    <div className="flex items-center justify-center h-[600px]">
+                      <div className="text-center">
+                        <Loader className="animate-spin text-reset-neon mx-auto mb-4" size={48} />
+                        <p className="text-reset-white text-lg font-semibold">
+                          Generando gráfico...
+                        </p>
+                        <p className="text-reset-gray-light text-sm mt-2">
+                          {variablesVisibles} variables • {targetName}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-[600px] text-reset-gray-light">
+                      <div className="text-center">
+                        <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                        <p>Selecciona al menos 2 variables para generar el gráfico</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Info adicional */}
+            {variables.length > 0 && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="card-reset bg-reset-gray-dark/50 border border-reset-neon/20 animate-fade-in">
+                  <div className="text-center">
+                    <p className="text-reset-neon text-3xl font-display">
+                      {variablesVisibles}
+                    </p>
+                    <p className="text-reset-gray-light text-sm mt-1">
+                      Variables visibles
+                    </p>
+                  </div>
+                </div>
+                <div className="card-reset bg-reset-gray-dark/50 border border-reset-cyan/20 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+                  <div className="text-center">
+                    <p className="text-reset-cyan text-3xl font-display">
+                      {variables.length}
+                    </p>
+                    <p className="text-reset-gray-light text-sm mt-1">
+                      Total detectadas
+                    </p>
+                  </div>
+                </div>
+                <div className="card-reset bg-reset-gray-dark/50 border border-reset-purple/20 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                  <div className="text-center">
+                    <p className="text-reset-purple text-3xl font-display">
+                      {targetName.substring(0, 12)}{targetName.length > 12 ? '...' : ''}
+                    </p>
+                    <p className="text-reset-gray-light text-sm mt-1">
+                      Target
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        </aside>
-
-        {/* ÁREA DEL GRÁFICO */}
-        <main className="flex-1 p-8 overflow-auto bg-reset-black">
-
-          {/* Estado inicial */}
-          {!datosListos && !loading && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center text-reset-gray-light">
-                <Upload className="w-24 h-24 mx-auto mb-4 opacity-30" />
-                <p className="text-xl">Sube un Excel TGI para empezar</p>
-                <p className="text-sm mt-2 opacity-70">
-                  Formatos soportados: .xlsx, .xls
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Gráfico */}
-          {datosListos && !loading && (
-            <div className="bg-reset-gray-dark rounded-lg shadow-xl p-6 card-reset-shadow">
-              {graficoUrl && !generandoGrafico ? (
-                <img
-                  src={graficoUrl}
-                  alt="AfiniMap"
-                  className="w-full h-auto rounded-lg"
-                />
-              ) : generandoGrafico ? (
-                <div className="text-center py-24">
-                  <Loader className="animate-spin h-12 w-12 text-reset-neon mx-auto" />
-                  <p className="text-reset-gray-light mt-4">Generando gráfico...</p>
-                </div>
-              ) : (
-                <div className="text-center py-24 text-reset-gray-light">
-                  <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                  <p>Selecciona al menos 2 variables para generar el gráfico</p>
-                </div>
-              )}
-            </div>
-          )}
-        </main>
+        </div>
       </div>
     </div>
   )
