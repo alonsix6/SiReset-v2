@@ -117,14 +117,15 @@ async def procesar_excel(
 
 @router.post("/generar-grafico")
 async def generar_grafico(
-    config: Dict[str, Any] = Body(...),
-    current_user: User = Depends(require_module("AfiniMap"))
+    config: Dict[str, Any] = Body(...)
 ) -> StreamingResponse:
     """
     Genera imagen PNG del gráfico AfiniMap
 
+    NOTA: Este endpoint NO requiere autenticación para funcionar sin DB.
+    El Excel ya fue procesado en el frontend.
+
     Valida:
-    - Usuario tiene acceso al módulo AfiniMap
     - Al menos 2 variables visibles
     - Valores de configuración válidos
 
@@ -143,10 +144,9 @@ async def generar_grafico(
 
     Raises:
         HTTPException 400: Configuración inválida (< 2 variables, colores inválidos)
-        HTTPException 403: Sin acceso al módulo
         HTTPException 500: Error generando gráfico
     """
-    logger.info(f"Usuario {current_user.email} generando gráfico AfiniMap")
+    logger.info("Generando gráfico AfiniMap")
 
     # 1. Validar configuración
     try:
