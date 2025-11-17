@@ -48,7 +48,7 @@ export default function Login({ onLogin }) {
           name: user.user_metadata?.name || user.user_metadata?.full_name || user.email,
           role: user.user_metadata?.role || 'user',
           active: true,
-          modules: user.user_metadata?.modules || ['Mougli', 'Mapito']
+          modules: user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox']
         }
 
         // Token JWT de Supabase

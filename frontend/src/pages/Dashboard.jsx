@@ -31,9 +31,8 @@ export default function Dashboard({ user }) {
     }
   ]
 
-  const userModules = modules.filter(m =>
-    user.role === 'admin' || user.modules.includes(m.code)
-  )
+  // Todos los módulos son visibles para todos los usuarios
+  const userModules = modules
 
   return (
     <div className="section-reset">
@@ -56,54 +55,42 @@ export default function Dashboard({ user }) {
         </div>
 
         {/* Modules Grid */}
-        {userModules.length === 0 ? (
-          <div className="alert-warning animate-fade-in">
-            <div className="flex items-center">
-              <span className="mr-2 text-2xl">⚠</span>
-              <div>
-                <p className="font-semibold mb-1">No tienes módulos habilitados</p>
-                <p className="text-sm opacity-80">Contacta a un administrador para obtener acceso a las herramientas.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+          {userModules.map((module, index) => (
+            <Link
+              key={module.code}
+              to={module.path}
+              className="group card-reset-shadow animate-fade-in-up"
+              style={{ animationDelay: `${index * 0.1}s` }}
+            >
+              {/* Module Header with Gradient */}
+              <div className={`h-40 bg-gradient-to-br ${module.gradient} rounded-t-reset flex items-center justify-center mb-6 -mt-6 -mx-6 relative overflow-hidden`}>
+                <div className="absolute inset-0 bg-reset-black opacity-40 group-hover:opacity-20 transition-opacity duration-300"></div>
+                <div className="relative z-10 transform group-hover:scale-110 transition-transform duration-300">
+                  <span className="text-reset-white text-7xl font-display">{module.icon}</span>
+                </div>
+                {/* Corner decoration */}
+                <div className="absolute bottom-0 right-0 w-24 h-24 border-r-4 border-b-4 border-reset-white opacity-20"></div>
               </div>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-            {userModules.map((module, index) => (
-              <Link
-                key={module.code}
-                to={module.path}
-                className="group card-reset-shadow animate-fade-in-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                {/* Module Header with Gradient */}
-                <div className={`h-40 bg-gradient-to-br ${module.gradient} rounded-t-reset flex items-center justify-center mb-6 -mt-6 -mx-6 relative overflow-hidden`}>
-                  <div className="absolute inset-0 bg-reset-black opacity-40 group-hover:opacity-20 transition-opacity duration-300"></div>
-                  <div className="relative z-10 transform group-hover:scale-110 transition-transform duration-300">
-                    <span className="text-reset-white text-7xl font-display">{module.icon}</span>
-                  </div>
-                  {/* Corner decoration */}
-                  <div className="absolute bottom-0 right-0 w-24 h-24 border-r-4 border-b-4 border-reset-white opacity-20"></div>
-                </div>
 
-                {/* Module Content */}
-                <div>
-                  <h3 className="font-display text-3xl text-reset-white mb-3 group-hover:text-gradient-neon transition-all duration-300">
-                    {module.title}
-                  </h3>
-                  <p className="text-reset-gray-light mb-4 leading-relaxed">
-                    {module.description}
-                  </p>
+              {/* Module Content */}
+              <div>
+                <h3 className="font-display text-3xl text-reset-white mb-3 group-hover:text-gradient-neon transition-all duration-300">
+                  {module.title}
+                </h3>
+                <p className="text-reset-gray-light mb-4 leading-relaxed">
+                  {module.description}
+                </p>
 
-                  {/* Access Button */}
-                  <div className="flex items-center text-reset-neon group-hover:text-reset-cyan transition-colors duration-300">
-                    <span className="font-semibold uppercase text-sm tracking-wider mr-2">Acceder</span>
-                    <span className="transform group-hover:translate-x-2 transition-transform duration-300">→</span>
-                  </div>
+                {/* Access Button */}
+                <div className="flex items-center text-reset-neon group-hover:text-reset-cyan transition-colors duration-300">
+                  <span className="font-semibold uppercase text-sm tracking-wider mr-2">Acceder</span>
+                  <span className="transform group-hover:translate-x-2 transition-transform duration-300">→</span>
                 </div>
-              </Link>
-            ))}
-          </div>
-        )}
+              </div>
+            </Link>
+          ))}
+        </div>
 
         {/* Divider */}
         <div className="divider-reset"></div>
@@ -149,7 +136,7 @@ export default function Dashboard({ user }) {
             <div className="card-reset group hover:border-reset-neon transition-all duration-300">
               <div className="flex items-start justify-between mb-3">
                 <div className="text-reset-gray-light text-xs font-bold uppercase tracking-wider">
-                  Módulos Activos
+                  Módulos Disponibles
                 </div>
                 <div className="w-8 h-8 bg-reset-neon bg-opacity-20 rounded-full flex items-center justify-center border border-reset-neon">
                   <span className="text-reset-neon text-xs">▶</span>
@@ -157,10 +144,10 @@ export default function Dashboard({ user }) {
               </div>
               <div className="flex items-baseline space-x-2">
                 <span className="text-reset-neon text-5xl font-display font-black">
-                  {userModules.length}
+                  {modules.length}
                 </span>
                 <span className="text-reset-gray-light text-sm">
-                  / {modules.length}
+                  Total
                 </span>
               </div>
             </div>
@@ -180,7 +167,7 @@ export default function Dashboard({ user }) {
               <ul className="text-reset-gray-light text-sm space-y-1">
                 <li className="flex items-center">
                   <span className="text-reset-cyan mr-2">▶</span>
-                  Accede a tus módulos desde la navegación superior
+                  Tienes acceso a todos los módulos desde el menú "Apps"
                 </li>
                 <li className="flex items-center">
                   <span className="text-reset-cyan mr-2">▶</span>
@@ -188,7 +175,7 @@ export default function Dashboard({ user }) {
                 </li>
                 <li className="flex items-center">
                   <span className="text-reset-cyan mr-2">▶</span>
-                  Si necesitas acceso a más módulos, contacta al administrador
+                  Usa el dropdown de Apps en el navbar para navegar entre herramientas
                 </li>
               </ul>
             </div>
