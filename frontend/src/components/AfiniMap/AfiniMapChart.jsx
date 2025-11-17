@@ -95,9 +95,9 @@ const AfiniMapChart = forwardRef(({
     // Verificar colisión - si hay colisión, poner abajo
     const hasCollision = checkCollision(centerX, centerY, index)
 
-    // Posición más pegada a la burbuja
+    // Posición más pegada a la burbuja (arriba -12, abajo +15)
     const labelX = centerX
-    const labelY = hasCollision ? centerY + 25 : centerY - 12
+    const labelY = hasCollision ? centerY + 15 : centerY - 12
 
     return (
       <text
