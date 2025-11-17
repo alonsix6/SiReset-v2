@@ -1086,24 +1086,18 @@ export default function Mapito({ user }) {
                 <div className="absolute left-0 right-0 mt-2 bg-reset-gray-dark border border-reset-gray-medium rounded-reset shadow-lg z-10 overflow-hidden">
                   <button
                     onClick={exportToPng}
-                    className="w-full px-4 py-3 text-left text-reset-white hover:bg-reset-gray-medium transition-colors flex items-center space-x-3 border-b border-reset-gray-medium"
+                    className="w-full px-3 py-2 text-left text-reset-white hover:bg-reset-gray-medium transition-colors flex items-center space-x-2 border-b border-reset-gray-medium text-sm"
                   >
-                    <span className="text-xl">📥</span>
-                    <div>
-                      <div className="font-semibold text-reset-neon">Descargar PNG</div>
-                      <div className="text-xs text-reset-gray-light">Guardar imagen en tu dispositivo</div>
-                    </div>
+                    <span>📥</span>
+                    <span className="font-semibold text-reset-neon">Descargar PNG</span>
                   </button>
 
                   <button
                     onClick={copyToClipboard}
-                    className="w-full px-4 py-3 text-left text-reset-white hover:bg-reset-gray-medium transition-colors flex items-center space-x-3"
+                    className="w-full px-3 py-2 text-left text-reset-white hover:bg-reset-gray-medium transition-colors flex items-center space-x-2 text-sm"
                   >
-                    <span className="text-xl">📋</span>
-                    <div>
-                      <div className="font-semibold text-reset-cyan">Copiar al Portapapeles</div>
-                      <div className="text-xs text-reset-gray-light">Pegar directamente en presentaciones</div>
-                    </div>
+                    <span>📋</span>
+                    <span className="font-semibold text-reset-cyan">Copiar al Portapapeles</span>
                   </button>
                 </div>
               )}
@@ -1189,12 +1183,9 @@ export default function Mapito({ user }) {
       {/* Feedback visual de copiado exitoso */}
       {showCopyFeedback && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
-          <div className="bg-gradient-to-r from-reset-neon to-green-400 text-reset-black px-6 py-4 rounded-reset shadow-2xl flex items-center space-x-3 border-2 border-reset-neon">
-            <span className="text-2xl">✅</span>
-            <div>
-              <div className="font-bold text-lg">¡Mapa copiado!</div>
-              <div className="text-sm opacity-90">Listo para pegar en tu presentación</div>
-            </div>
+          <div className="bg-gradient-to-r from-reset-neon to-green-400 text-reset-black px-5 py-3 rounded-reset shadow-2xl flex items-center space-x-2 border-2 border-reset-neon">
+            <span className="text-xl">✅</span>
+            <div className="font-bold text-base">¡Mapito listo!</div>
           </div>
         </div>
       )}
