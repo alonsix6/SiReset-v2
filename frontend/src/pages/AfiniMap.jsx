@@ -1,40 +1,31 @@
-import { useState, useEffect } from 'react'
-import { Upload, Download, Loader, FileSpreadsheet, X } from 'lucide-react'
+import { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
+import { toPng } from 'html-to-image'
+import { Download, Loader, Upload, FileSpreadsheet, X } from 'lucide-react'
 
+import AfiniMapChart from '../components/AfiniMap/AfiniMapChart'
 import AfiniMapControls from '../components/AfiniMap/AfiniMapControls'
 import VariableSelector from '../components/AfiniMap/VariableSelector'
-
-// En producción (Cloud Run), frontend y backend están en el mismo servidor
-// Usar URL relativa vacía para que las llamadas vayan al mismo dominio
-// En desarrollo local, usar localhost:8080
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '' : 'http://localhost:8080')
+import ColorCustomizer from '../components/AfiniMap/ColorCustomizer'
 
 export default function AfiniMap({ user }) {
   // Estados principales
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [fileName, setFileName] = useState('')
-
-  // Datos del Excel procesado (en frontend)
   const [targetName, setTargetName] = useState('')
   const [variables, setVariables] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [exporting, setExporting] = useState(false)
 
-  // Imagen del gráfico (generada en backend)
-  const [graficoUrl, setGraficoUrl] = useState('')
-  const [generandoGrafico, setGenerandoGrafico] = useState(false)
-
-  // Configuración
+  // Estados de configuración
   const [topN, setTopN] = useState(10)
-  const [ordenarPor, setOrdenarPor] = useState('consumo') // 'consumo' | 'afinidad'
+  const [ordenarPor, setOrdenarPor] = useState('consumo')
   const [lineaAfinidad, setLineaAfinidad] = useState(110)
   const [colorBurbujas, setColorBurbujas] = useState('#cf3b4d')
   const [colorFondo, setColorFondo] = useState('#fff2f4')
-  const [highlightedVariable, setHighlightedVariable] = useState('')
-  const [highlightColor, setHighlightColor] = useState('#FF0080')
-  const [colorTexto, setColorTexto] = useState('#FFFFFF')
-  const [colorEjeX, setColorEjeX] = useState('#AAAAAA')
-  const [colorEjeY, setColorEjeY] = useState('#AAAAAA')
+
+  // Ref para exportar
+  const chartRef = useRef(null)
 
   // ========== PROCESAMIENTO EXCEL (EN FRONTEND) ==========
 
@@ -43,7 +34,7 @@ export default function AfiniMap({ user }) {
     setError('')
 
     try {
-      // Extraer target de D5 (row 4, col 3)
+      // Extraer target de D5
       const target = jsonData[4]?.[3]
       if (!target) {
         setError('No se encontró el nombre del Target en celda D5. Verifica la estructura del archivo TGI.')
@@ -54,35 +45,26 @@ export default function AfiniMap({ user }) {
 
       const extractedVariables = []
 
-      // Procesar desde fila 8 en adelante (índice 7 en array)
+      // Procesar desde fila 8 en adelante
       for (let i = 7; i < jsonData.length; i++) {
         const row = jsonData[i]
 
-        // Verificar si columna B dice "Vert%"
         if (row[1] === 'Vert%') {
-          // Variable nombre está en columna A
           const nombre = row[0]
-
-          // Consumo (Vert%) está en columna D
           let consumoRaw = row[3]
           let consumo = 0
 
-          // Convertir a número si es necesario
           if (typeof consumoRaw === 'number') {
             consumo = consumoRaw
           } else if (typeof consumoRaw === 'string') {
             consumo = parseFloat(consumoRaw)
           }
 
-          // La siguiente fila debe tener "Afinidad" en columna B
           const nextRow = jsonData[i + 1]
           if (nextRow && nextRow[1] === 'Afinidad') {
-            const afinidadRaw = nextRow[3] // Columna D
-
-            // Convertir afinidad
+            const afinidadRaw = nextRow[3]
             const afinidad = parseFloat(afinidadRaw)
 
-            // Solo agregar si valores válidos y consumo > 0
             if (!isNaN(consumo) && !isNaN(afinidad) && consumo > 0 && nombre) {
               extractedVariables.push({
                 nombre: String(nombre).trim(),
@@ -92,7 +74,7 @@ export default function AfiniMap({ user }) {
               })
             }
 
-            i++ // Saltar la fila de Afinidad ya procesada
+            i++
           }
         }
       }
@@ -106,12 +88,6 @@ export default function AfiniMap({ user }) {
       setVariables(extractedVariables)
       setTopN(Math.min(10, extractedVariables.length))
       setLoading(false)
-
-      // Generar gráfico inicial
-      setTimeout(() => {
-        actualizarGrafico(extractedVariables)
-      }, 100)
-
     } catch (err) {
       console.error('Error procesando Excel:', err)
       setError(`Error procesando el archivo: ${err.message}`)
@@ -123,7 +99,6 @@ export default function AfiniMap({ user }) {
     const file = event.target.files[0]
     if (!file) return
 
-    // Validar extensión
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
       setError('Por favor sube un archivo Excel (.xlsx o .xls)')
       return
@@ -139,8 +114,6 @@ export default function AfiniMap({ user }) {
       try {
         const data = new Uint8Array(e.target.result)
         const workbook = XLSX.read(data, { type: 'array' })
-
-        // Leer la primera hoja (no importa el nombre)
         const firstSheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[firstSheetName]
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null })
@@ -165,7 +138,6 @@ export default function AfiniMap({ user }) {
     setFileName('')
     setVariables([])
     setTargetName('')
-    setGraficoUrl('')
     setError('')
   }
 
@@ -187,6 +159,33 @@ export default function AfiniMap({ user }) {
     setVariables(updatedVariables)
   }
 
+  const handleExport = async () => {
+    if (!chartRef.current) return
+
+    setExporting(true)
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      const dataUrl = await toPng(chartRef.current, {
+        backgroundColor: colorFondo,
+        pixelRatio: 3,
+        quality: 1
+      })
+
+      const link = document.createElement('a')
+      link.download = `afinimap-${targetName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`
+      link.href = dataUrl
+      link.click()
+
+      setExporting(false)
+    } catch (err) {
+      console.error('Error exportando imagen:', err)
+      setError('Error al exportar la imagen')
+      setExporting(false)
+    }
+  }
+
   // ========== COMPUTED VALUES ==========
 
   const variablesOrdenadas = () => {
@@ -194,88 +193,17 @@ export default function AfiniMap({ user }) {
 
     let vars = [...variables]
 
-    // Ordenar
     if (ordenarPor === 'consumo') {
       vars.sort((a, b) => b.consumo - a.consumo)
     } else {
       vars.sort((a, b) => b.afinidad - a.afinidad)
     }
 
-    // Aplicar Top N
     const limit = topN === variables.length ? variables.length : topN
     return vars.slice(0, limit)
   }
 
-  // ========== GENERACIÓN DE GRÁFICO (BACKEND) ==========
-
-  const actualizarGrafico = async (varsToUse = null) => {
-    const vars = varsToUse || variablesOrdenadas()
-    const visibles = vars.filter(v => v.visible)
-
-    if (visibles.length < 2) {
-      setGraficoUrl('')
-      return
-    }
-
-    setGenerandoGrafico(true)
-    setError('')
-
-    try {
-      const response = await fetch(`${API_URL}/api/afinimap/generar-grafico`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          variables: visibles,
-          target_name: targetName,
-          linea_afinidad: lineaAfinidad,
-          color_burbujas: colorBurbujas,
-          color_fondo: colorFondo
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Error generando gráfico')
-      }
-
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-
-      // Liberar URL anterior si existe
-      if (graficoUrl) {
-        URL.revokeObjectURL(graficoUrl)
-      }
-
-      setGraficoUrl(url)
-      setGenerandoGrafico(false)
-
-    } catch (err) {
-      console.error('Error generando gráfico:', err)
-      setError(`Error: ${err.message}`)
-      setGenerandoGrafico(false)
-    }
-  }
-
-  // Auto-actualizar gráfico cuando cambian configuraciones
-  useEffect(() => {
-    if (variables.length > 0) {
-      actualizarGrafico()
-    }
-  }, [topN, ordenarPor, lineaAfinidad, colorBurbujas, colorFondo])
-
-  // Descargar PNG
-  const handleDescargarPNG = () => {
-    if (!graficoUrl) return
-
-    const link = document.createElement('a')
-    link.href = graficoUrl
-    link.download = `afinimap-${targetName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`
-    link.click()
-  }
-
-  const dataParaSelector = variablesOrdenadas()
+  const dataParaGrafico = variablesOrdenadas()
 
   // ========== RENDER ==========
 
@@ -365,38 +293,24 @@ export default function AfiniMap({ user }) {
               )}
             </div>
 
-            {/* Personalización (PRIMERO) */}
+            {/* Configuración */}
             {variables.length > 0 && (
               <AfiniMapControls
-                colorBurbujas={colorBurbujas}
-                onColorBurbujasChange={(val) => { setColorBurbujas(val) }}
-                colorFondo={colorFondo}
-                onColorFondoChange={(val) => { setColorFondo(val) }}
-                highlightedVariable={highlightedVariable}
-                onHighlightChange={setHighlightedVariable}
-                highlightColor={highlightColor}
-                onHighlightColorChange={setHighlightColor}
-                colorTexto={colorTexto}
-                onColorTextoChange={setColorTexto}
-                colorEjeX={colorEjeX}
-                onColorEjeXChange={setColorEjeX}
-                colorEjeY={colorEjeY}
-                onColorEjeYChange={setColorEjeY}
-                lineaAfinidad={lineaAfinidad}
-                onLineaAfinidadChange={(val) => { setLineaAfinidad(val) }}
                 topN={topN}
-                onTopNChange={(val) => { setTopN(val) }}
+                onTopNChange={setTopN}
                 ordenarPor={ordenarPor}
-                onOrdenarPorChange={(val) => { setOrdenarPor(val) }}
-                variables={dataParaSelector}
-                disabled={loading || generandoGrafico}
+                onOrdenarPorChange={setOrdenarPor}
+                lineaAfinidad={lineaAfinidad}
+                onLineaAfinidadChange={setLineaAfinidad}
+                totalVariables={variables.length}
+                disabled={loading}
               />
             )}
 
-            {/* Variables a Mostrar (SEGUNDO) */}
+            {/* Variables a Mostrar */}
             {variables.length > 0 && (
               <VariableSelector
-                variables={dataParaSelector}
+                variables={dataParaGrafico}
                 onToggleVariable={handleToggleVariable}
                 onToggleAll={handleToggleAll}
               />
@@ -416,42 +330,45 @@ export default function AfiniMap({ user }) {
               <>
                 {/* Gráfico */}
                 <div className="card-reset-shadow animate-fade-in">
-                  {generandoGrafico ? (
-                    <div className="flex items-center justify-center min-h-[600px]">
-                      <div className="text-center">
-                        <Loader className="animate-spin text-reset-cyan mx-auto mb-4" size={48} />
-                        <p className="text-reset-white font-semibold">Generando gráfico...</p>
-                      </div>
-                    </div>
-                  ) : graficoUrl ? (
-                    <img
-                      src={graficoUrl}
-                      alt="AfiniMap"
-                      className="w-full h-auto"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center min-h-[600px] text-reset-gray-light">
-                      <div className="text-center">
-                        <p className="text-lg font-semibold">Selecciona al menos 2 variables</p>
-                        <p className="text-sm mt-2">para generar el gráfico</p>
-                      </div>
-                    </div>
-                  )}
+                  <AfiniMapChart
+                    ref={chartRef}
+                    data={dataParaGrafico}
+                    targetName={targetName}
+                    colorBurbujas={colorBurbujas}
+                    colorFondo={colorFondo}
+                    lineaAfinidad={lineaAfinidad}
+                  />
                 </div>
 
-                {/* Botón Descargar */}
-                {graficoUrl && (
-                  <div className="flex justify-center animate-fade-in-up">
-                    <button
-                      onClick={handleDescargarPNG}
-                      disabled={generandoGrafico}
-                      className="btn-primary-large group"
-                    >
-                      <Download size={20} />
-                      <span>Descargar PNG (300 DPI)</span>
-                    </button>
-                  </div>
-                )}
+                {/* Personalización de Colores (DEBAJO DEL GRÁFICO) */}
+                <ColorCustomizer
+                  colorBurbujas={colorBurbujas}
+                  onColorBurbujasChange={setColorBurbujas}
+                  colorFondo={colorFondo}
+                  onColorFondoChange={setColorFondo}
+                  disabled={loading}
+                />
+
+                {/* Botón Export */}
+                <div className="flex justify-center animate-fade-in-up">
+                  <button
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className="btn-primary-large group"
+                  >
+                    {exporting ? (
+                      <>
+                        <Loader className="animate-spin" size={20} />
+                        <span>Exportando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download size={20} />
+                        <span>Descargar PNG (300 DPI)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </>
             ) : (
               <div className="card-reset-shadow flex items-center justify-center min-h-[600px]">
