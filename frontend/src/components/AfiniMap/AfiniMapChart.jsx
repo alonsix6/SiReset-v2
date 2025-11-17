@@ -47,6 +47,31 @@ const AfiniMapChart = forwardRef(({
     return null
   }
 
+  // Helper: Verificar si hay colisión con otras burbujas
+  const checkCollision = (x, y, currentIndex, threshold = 35) => {
+    // Verificar si la posición (x, y) está muy cerca de otra burbuja
+    for (let i = 0; i < visibleData.length; i++) {
+      if (i === currentIndex) continue
+
+      const other = visibleData[i]
+      const dx = Math.abs(other.consumo - visibleData[currentIndex].consumo)
+      const dy = Math.abs(other.afinidad - visibleData[currentIndex].afinidad)
+
+      // Normalizar usando los rangos del dominio
+      const consumoRange = xDomain[1] - xDomain[0]
+      const afinidadRange = yDomain[1] - yDomain[0]
+
+      const normalizedDx = (dx / consumoRange) * 100
+      const normalizedDy = (dy / afinidadRange) * 100
+
+      // Si está cerca arriba, hay colisión
+      if (normalizedDx < 8 && normalizedDy > 0 && normalizedDy < 12) {
+        return true
+      }
+    }
+    return false
+  }
+
   // Custom label con fondo blanco
   const renderCustomLabel = (props) => {
     const { x, y, index, value, cx, cy, payload } = props
@@ -67,9 +92,12 @@ const AfiniMapChart = forwardRef(({
       return null
     }
 
-    // Posición arriba de la burbuja
+    // Verificar colisión - si hay colisión, poner abajo
+    const hasCollision = checkCollision(centerX, centerY, index)
+
+    // Posición más pegada a la burbuja
     const labelX = centerX
-    const labelY = centerY - 20
+    const labelY = hasCollision ? centerY + 25 : centerY - 12
 
     return (
       <text
@@ -131,25 +159,22 @@ const AfiniMapChart = forwardRef(({
   ]
 
   // Tamaño fijo para todas las burbujas (no calculado)
-  const TAMANO_FIJO = 400
+  const TAMANO_FIJO = 650
 
   return (
-    <div ref={ref} className="w-full" style={{ backgroundColor: colorFondo }}>
-      {/* Título */}
-      <div className="text-center py-6">
-        <h2 className="text-2xl font-display text-reset-white mb-2">
-          Mapa de Afinidad TGI
-        </h2>
-        {targetName && (
+    <div ref={ref} className="w-full" style={{ backgroundColor: 'transparent' }}>
+      {/* Target */}
+      {targetName && (
+        <div className="text-center py-4">
           <p className="text-reset-cyan text-lg font-semibold">
             Target: {targetName}
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Gráfico */}
-      <div className="pb-6">
-        <ResponsiveContainer width="100%" height={600}>
+      <div className="pb-4">
+        <ResponsiveContainer width="100%" height={600} style={{ backgroundColor: colorFondo }}>
           <ScatterChart
             margin={{ top: 80, right: 80, bottom: 80, left: 80 }}
           >
@@ -170,7 +195,7 @@ const AfiniMapChart = forwardRef(({
               <Label
                 value="Consumo (%)"
                 position="bottom"
-                offset={40}
+                offset={15}
                 style={{ fill: '#AAAAAA', fontSize: 16, fontWeight: 'bold' }}
               />
             </XAxis>
@@ -188,7 +213,7 @@ const AfiniMapChart = forwardRef(({
                 value="Afinidad"
                 angle={-90}
                 position="left"
-                offset={40}
+                offset={15}
                 style={{ fill: '#AAAAAA', fontSize: 16, fontWeight: 'bold' }}
               />
             </YAxis>
