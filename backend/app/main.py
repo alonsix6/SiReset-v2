@@ -11,7 +11,7 @@ import time
 import os
 from pathlib import Path
 
-from app.api.routes import auth, mougli, mapito, setup
+from app.api.routes import auth, mougli, mapito, setup, afinimap
 from app.core.config import settings
 
 app = FastAPI(
@@ -50,6 +50,7 @@ async def health_check():
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(mougli.router, prefix="/api/mougli", tags=["mougli"])
 app.include_router(mapito.router, prefix="/api/mapito", tags=["mapito"])
+app.include_router(afinimap.router, prefix="/api/afinimap", tags=["afinimap"])
 app.include_router(setup.router, prefix="/api/setup", tags=["setup"])
 
 # Servir archivos estáticos del frontend (para producción en Cloud Run)
