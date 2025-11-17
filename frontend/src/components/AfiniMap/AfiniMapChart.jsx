@@ -111,22 +111,27 @@ const AfiniMapChart = forwardRef(({
     )
   }
 
-  // Calcular dominio dinámico
+  // Calcular dominio dinámico basado en los datos reales
   const maxConsumo = Math.max(...visibleData.map(d => d.consumo))
+  const minConsumo = Math.min(...visibleData.map(d => d.consumo))
   const maxAfinidad = Math.max(...visibleData.map(d => d.afinidad))
+  const minAfinidad = Math.min(...visibleData.map(d => d.afinidad))
 
-  const xDomain = [0, Math.ceil(maxConsumo / 10) * 10 + 10]
-  const yDomain = [0, Math.ceil(maxAfinidad / 50) * 50 + 50]
+  // Calcular dominios con padding del 10%
+  const consumoRange = maxConsumo - minConsumo
+  const afinidadRange = maxAfinidad - minAfinidad
 
-  // Normalizar tamaños [200-1200]
-  const consumos = visibleData.map(d => d.consumo)
-  const minConsumo = Math.min(...consumos)
-  const maxConsumoNorm = Math.max(...consumos)
+  const xDomain = [
+    Math.max(0, Math.floor(minConsumo - consumoRange * 0.1)),
+    Math.ceil(maxConsumo + consumoRange * 0.1)
+  ]
+  const yDomain = [
+    Math.max(0, Math.floor(minAfinidad - afinidadRange * 0.1)),
+    Math.ceil(maxAfinidad + afinidadRange * 0.1)
+  ]
 
-  const dataConTamano = visibleData.map(d => ({
-    ...d,
-    tamano: ((d.consumo - minConsumo) / (maxConsumoNorm - minConsumo)) * 1000 + 200
-  }))
+  // Tamaño fijo para todas las burbujas (no calculado)
+  const TAMANO_FIJO = 400
 
   return (
     <div ref={ref} className="w-full" style={{ backgroundColor: colorFondo }}>
@@ -190,8 +195,7 @@ const AfiniMapChart = forwardRef(({
 
             <ZAxis
               type="number"
-              dataKey="tamano"
-              range={[200, 1200]}
+              range={[TAMANO_FIJO, TAMANO_FIJO]}
               name="Tamaño"
             />
 
@@ -217,10 +221,10 @@ const AfiniMapChart = forwardRef(({
             {/* Scatter de variables */}
             <Scatter
               name="Variables"
-              data={dataConTamano}
+              data={visibleData}
               fill={colorBurbujas}
             >
-              {dataConTamano.map((entry, index) => (
+              {visibleData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={colorBurbujas}
