@@ -179,7 +179,15 @@ export default function AfiniMap({ user }) {
     const vars = varsToUse || variablesOrdenadas()
     const visibles = vars.filter(v => v.visible)
 
+    console.log('🎨 actualizarGrafico llamado:', {
+      varsToUse: varsToUse ? varsToUse.length : 'null',
+      vars: vars.length,
+      visibles: visibles.length,
+      targetName
+    })
+
     if (visibles.length < 2) {
+      console.log('⚠️ Menos de 2 variables visibles, no se genera gráfico')
       setGraficoUrl('')
       return
     }
@@ -196,6 +204,8 @@ export default function AfiniMap({ user }) {
         color_fondo: colorFondo
       }
 
+      console.log('📤 Enviando request al backend:', API_URL)
+
       const token = localStorage.getItem('token')
 
       const response = await fetch(`${API_URL}/api/afinimap/generar-grafico`, {
@@ -207,11 +217,14 @@ export default function AfiniMap({ user }) {
         body: JSON.stringify(config)
       })
 
+      console.log('📥 Response status:', response.status, response.statusText)
+
       if (!response.ok) {
         throw new Error(`Error generando gráfico: ${response.statusText}`)
       }
 
       const blob = await response.blob()
+      console.log('✓ Blob recibido:', blob.size, 'bytes, tipo:', blob.type)
 
       // Revocar URL anterior si existe
       if (graficoUrl) {
@@ -219,10 +232,11 @@ export default function AfiniMap({ user }) {
       }
 
       const newUrl = URL.createObjectURL(blob)
+      console.log('✓ URL del gráfico creada:', newUrl)
       setGraficoUrl(newUrl)
 
     } catch (err) {
-      console.error('Error generando gráfico:', err)
+      console.error('❌ Error generando gráfico:', err)
       setError(err.message || 'Error generando el gráfico')
     } finally {
       setGenerandoGrafico(false)
