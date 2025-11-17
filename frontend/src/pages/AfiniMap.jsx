@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Upload, Download, Loader, AlertCircle, CheckCircle, FileSpreadsheet } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -24,6 +25,133 @@ export default function AfiniMap({ user }) {
   const [colorBurbujas, setColorBurbujas] = useState('#cf3b4d')
   const [colorFondo, setColorFondo] = useState('#fff2f4')
 
+  // ========== PROCESAMIENTO EXCEL (EN FRONTEND - COMO THE BOX) ==========
+
+  const processExcelData = (jsonData) => {
+    setLoading(true)
+    setError('')
+
+    try {
+      // 1. Extraer target de Fila 5 (índice 4), Columna D (índice 3)
+      const target = jsonData[4]?.[3] || 'Target no especificado'
+      setTargetName(String(target).trim())
+
+      const extractedVariables = []
+
+      // 2. Procesar desde fila 8 (índice 7)
+      for (let i = 7; i < jsonData.length; i++) {
+        const row = jsonData[i]
+        const tipoMetrica = row[1] // Columna B
+
+        // Verificar si es una fila "Vert%"
+        if (tipoMetrica === 'Vert%') {
+          // Verificar que la siguiente fila sea "Afinidad"
+          const nextRow = jsonData[i + 1]
+          if (nextRow && nextRow[1] === 'Afinidad') {
+            const nombre = row[0] || ''  // Columna A
+            const consumoRaw = row[3]    // Columna D
+            const afinidadRaw = nextRow[3] // Columna D de siguiente fila
+
+            // Convertir consumo (puede ser "48.1%" o 0.481)
+            let consumo = 0
+            if (typeof consumoRaw === 'string' && consumoRaw.includes('%')) {
+              consumo = parseFloat(consumoRaw.replace('%', '')) / 100
+            } else if (typeof consumoRaw === 'number') {
+              consumo = consumoRaw
+            } else if (typeof consumoRaw === 'string') {
+              consumo = parseFloat(consumoRaw)
+            }
+
+            // Convertir afinidad
+            const afinidad = parseFloat(afinidadRaw)
+
+            // Solo agregar si valores válidos y consumo > 0
+            if (!isNaN(consumo) && !isNaN(afinidad) && consumo > 0 && nombre) {
+              extractedVariables.push({
+                nombre: String(nombre).trim(),
+                consumo: consumo,
+                afinidad: afinidad,
+                visible: true
+              })
+            }
+
+            i++  // Saltar la fila de Afinidad ya procesada
+          }
+        }
+      }
+
+      if (extractedVariables.length === 0) {
+        setError('No se encontraron variables válidas en el Excel. Verifica la estructura TGI.')
+        setLoading(false)
+        return
+      }
+
+      setVariables(extractedVariables)
+      setLoading(false)
+
+      // Generar gráfico inicial
+      setTimeout(() => {
+        actualizarGrafico(extractedVariables)
+      }, 100)
+
+    } catch (err) {
+      console.error('Error procesando Excel:', err)
+      setError(`Error procesando el archivo: ${err.message}`)
+      setLoading(false)
+    }
+  }
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+
+    // Validar extensión
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      setError('Por favor sube un archivo Excel (.xlsx o .xls)')
+      return
+    }
+
+    setFileName(file.name)
+    setLoading(true)
+    setError('')
+
+    const reader = new FileReader()
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result)
+        const workbook = XLSX.read(data, { type: 'array' })
+
+        // Leer la primera hoja (no importa el nombre)
+        const firstSheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[firstSheetName]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null })
+
+        processExcelData(jsonData)
+
+      } catch (err) {
+        console.error('Error leyendo Excel:', err)
+        setError('Error leyendo el archivo Excel. Verifica que sea un formato válido.')
+        setLoading(false)
+      }
+    }
+
+    reader.onerror = () => {
+      setError('Error leyendo el archivo')
+      setLoading(false)
+    }
+
+    reader.readAsArrayBuffer(file)
+  }
+
+  const handleClearFile = () => {
+    setFileName('')
+    setVariables([])
+    setTargetName('')
+    setGraficoUrl('')
+    setError('')
+  }
+
   // ========== COMPUTED VALUES ==========
 
   const variablesOrdenadas = () => {
@@ -45,72 +173,7 @@ export default function AfiniMap({ user }) {
 
   const variablesVisibles = variables.filter(v => v.visible).length
 
-  // ========== FUNCIONES ==========
-
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0]
-    if (!file) return
-
-    // Validar extensión
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      setError('Por favor sube un archivo Excel (.xlsx o .xls)')
-      return
-    }
-
-    // Validar tamaño (50MB max)
-    if (file.size > 50 * 1024 * 1024) {
-      setError('Archivo muy grande. Máximo: 50MB')
-      return
-    }
-
-    setFileName(file.name)
-    setLoading(true)
-    setError('')
-
-    try {
-      const formData = new FormData()
-      formData.append('excel', file)
-
-      const token = localStorage.getItem('token') // FIX: era 'supabase.auth.token'
-
-      const response = await fetch(`${API_URL}/api/afinimap/procesar-excel`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Error procesando archivo')
-      }
-
-      const data = await response.json()
-
-      setTargetName(data.target_name)
-      setVariables(data.variables)
-
-      // Generar gráfico inicial automáticamente
-      setTimeout(() => {
-        actualizarGrafico(data.variables)
-      }, 100)
-
-    } catch (err) {
-      console.error('Error subiendo archivo:', err)
-      setError(err.message || 'Error procesando el archivo Excel')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleClearFile = () => {
-    setFileName('')
-    setVariables([])
-    setTargetName('')
-    setGraficoUrl('')
-    setError('')
-  }
+  // ========== GENERACIÓN DE GRÁFICO ==========
 
   const actualizarGrafico = async (varsToUse = null) => {
     const vars = varsToUse || variablesOrdenadas()
@@ -133,20 +196,19 @@ export default function AfiniMap({ user }) {
         color_fondo: colorFondo
       }
 
-      const token = localStorage.getItem('token') // FIX: era 'supabase.auth.token'
+      const token = localStorage.getItem('token')
 
       const response = await fetch(`${API_URL}/api/afinimap/generar-grafico`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token && { 'Authorization': `Bearer ${token}` })  // Token opcional
         },
         body: JSON.stringify(config)
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Error generando gráfico')
+        throw new Error(`Error generando gráfico: ${response.statusText}`)
       }
 
       const blob = await response.blob()
