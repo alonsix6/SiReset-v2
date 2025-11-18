@@ -63,3 +63,4 @@ logs/
 *.tmp
 .cache/
 .temp/
+.env.yaml
