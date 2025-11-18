@@ -527,7 +527,7 @@ export default function AfiniMap({ user }) {
                   <button
                     onClick={handleActualizarGrafico}
                     disabled={loading || generatingGraph}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-reset-cyan to-reset-neon text-reset-bg font-semibold rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
+                    className="flex items-center gap-2 px-6 py-3 bg-reset-gray-dark border-2 border-reset-cyan text-reset-cyan font-semibold rounded-lg hover:bg-reset-cyan/10 hover:border-reset-neon transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <RefreshCw size={20} className={generatingGraph ? 'animate-spin' : ''} />
                     <span>Actualizar Gráfico</span>
@@ -537,7 +537,7 @@ export default function AfiniMap({ user }) {
                   <button
                     onClick={handleExport}
                     disabled={exporting || !graphImage}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-reset-purple to-reset-magenta text-white font-semibold rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
+                    className="flex items-center gap-2 px-6 py-3 bg-reset-gray-dark border-2 border-reset-purple text-reset-purple font-semibold rounded-lg hover:bg-reset-purple/10 hover:border-reset-magenta transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {exporting ? (
                       <>
