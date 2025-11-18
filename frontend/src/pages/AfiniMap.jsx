@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
-import { Download, Loader, Upload, FileSpreadsheet, X } from 'lucide-react'
+import { Download, Loader, Upload, FileSpreadsheet, X, RefreshCw } from 'lucide-react'
 import axios from 'axios'
 
 import AfiniMapControls from '../components/AfiniMap/AfiniMapControls'
@@ -297,102 +297,30 @@ export default function AfiniMap({ user }) {
     }
   }
 
-  // Regenerar gráfico cuando cambian los parámetros
+  // Actualizar configuración sin regenerar automáticamente
   const handleTopNChange = (newTopN) => {
     setTopN(newTopN)
-    // Pasar el nuevo valor directamente para evitar delay de React state
-    generarGrafico(variables, targetName, newTopN, null, null)
   }
 
   const handleOrdenarPorChange = (newOrdenar) => {
     setOrdenarPor(newOrdenar)
-    // Pasar el nuevo valor directamente para evitar delay de React state
-    generarGrafico(variables, targetName, null, newOrdenar, null)
   }
 
   const handleLineaAfinidadChange = (newLinea) => {
     setLineaAfinidad(newLinea)
-    // Pasar el nuevo valor directamente para evitar delay de React state
-    generarGrafico(variables, targetName, null, null, newLinea)
   }
 
   const handleColorBurbujasChange = (newColor) => {
     setColorBurbujas(newColor)
-    // Regenerar con el nuevo color inmediatamente
-    setTimeout(() => {
-      generarGraficoConColores(variables, targetName, newColor, colorFondo)
-    }, 100)
   }
 
   const handleColorFondoChange = (newColor) => {
     setColorFondo(newColor)
-    // Regenerar con el nuevo color inmediatamente
-    setTimeout(() => {
-      generarGraficoConColores(variables, targetName, colorBurbujas, newColor)
-    }, 100)
   }
 
-  // Helper para regenerar con colores específicos
-  const generarGraficoConColores = async (vars, target, bubbleColor, bgColor) => {
-    setGeneratingGraph(true)
-    setError('')
-
-    try {
-      // Usar valores actuales del estado
-      const varsOrdenadas = [...vars]
-
-      if (ordenarPor === 'consumo') {
-        varsOrdenadas.sort((a, b) => b.consumo - a.consumo)
-      } else {
-        varsOrdenadas.sort((a, b) => b.afinidad - a.afinidad)
-      }
-
-      const limit = topN === vars.length ? vars.length : topN
-      let varsParaGrafico = varsOrdenadas.slice(0, limit).filter(v => v.visible)
-
-      varsParaGrafico = varsParaGrafico.filter(v => {
-        const isValid = (
-          v.nombre &&
-          typeof v.consumo === 'number' &&
-          typeof v.afinidad === 'number' &&
-          !isNaN(v.consumo) &&
-          !isNaN(v.afinidad) &&
-          v.consumo > 0 &&
-          v.afinidad > 0
-        )
-        return isValid
-      })
-
-      if (varsParaGrafico.length < 2) {
-        setGraphImage(null)
-        setGeneratingGraph(false)
-        return
-      }
-
-      const response = await axios.post(
-        `${API_URL}/api/afinimap/generar-grafico`,
-        {
-          variables: varsParaGrafico,
-          target_name: target,
-          linea_afinidad: lineaAfinidad,
-          color_burbujas: bubbleColor,
-          color_fondo: bgColor
-        },
-        {
-          responseType: 'blob',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-
-      const imageUrl = URL.createObjectURL(response.data)
-      setGraphImage(imageUrl)
-      setGeneratingGraph(false)
-    } catch (err) {
-      console.error('Error generando gráfico:', err)
-      setGeneratingGraph(false)
-    }
+  // Actualizar gráfico manualmente
+  const handleActualizarGrafico = () => {
+    generarGrafico(variables, targetName, topN, ordenarPor, lineaAfinidad)
   }
 
   const handleExport = async () => {
@@ -593,6 +521,18 @@ export default function AfiniMap({ user }) {
                   disabled={loading || generatingGraph}
                 />
 
+                {/* Botón Actualizar Gráfico */}
+                <div className="flex justify-center animate-fade-in-up">
+                  <button
+                    onClick={handleActualizarGrafico}
+                    disabled={loading || generatingGraph}
+                    className="btn-primary-large group"
+                  >
+                    <RefreshCw size={20} className={generatingGraph ? 'animate-spin' : ''} />
+                    <span>Actualizar Gráfico</span>
+                  </button>
+                </div>
+
                 {/* Botón Export */}
                 <div className="flex justify-center animate-fade-in-up">
                   <button
@@ -608,7 +548,7 @@ export default function AfiniMap({ user }) {
                     ) : (
                       <>
                         <Download size={20} />
-                        <span>Descargar PNG (300 DPI)</span>
+                        <span>Descargar PNG</span>
                       </>
                     )}
                   </button>
