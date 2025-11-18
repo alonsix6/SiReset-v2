@@ -364,7 +364,7 @@ def generar_afinimap_matplotlib(
 
     # ========== GRID Y ESTILO ==========
 
-    plt.grid(True, alpha=0.3, zorder=0, linestyle='-', linewidth=1, color='rgba(170, 170, 170, 0.3)')
+    plt.grid(True, alpha=0.3, zorder=0, linestyle='-', linewidth=1, color='#AAAAAA')
 
     ax.spines['top'].set_visible(True)
     ax.spines['right'].set_visible(True)
