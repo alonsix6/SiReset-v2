@@ -375,7 +375,7 @@ def generar_afinimap_matplotlib(
 
     # ========== TÍTULO ==========
 
-    plt.title(f'Target: {target_name}', fontsize=18, fontweight='bold', color='#00CED1', pad=15)
+    plt.title(f'AfiniMap - {target_name}', fontsize=14, fontfamily='Arial', fontweight='normal', color='#000000', pad=12)
 
     # ========== GUARDAR A BytesIO ==========
 

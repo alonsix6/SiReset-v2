@@ -303,13 +303,83 @@ export default function AfiniMap({ user }) {
   }
 
   const handleColorBurbujasChange = (e) => {
-    setColorBurbujas(e.target.value)
-    setTimeout(() => generarGrafico(), 100)
+    const newColor = e.target.value
+    setColorBurbujas(newColor)
+    // Regenerar con el nuevo color inmediatamente
+    setTimeout(() => {
+      generarGraficoConColores(variables, targetName, newColor, colorFondo)
+    }, 100)
   }
 
   const handleColorFondoChange = (e) => {
-    setColorFondo(e.target.value)
-    setTimeout(() => generarGrafico(), 100)
+    const newColor = e.target.value
+    setColorFondo(newColor)
+    // Regenerar con el nuevo color inmediatamente
+    setTimeout(() => {
+      generarGraficoConColores(variables, targetName, colorBurbujas, newColor)
+    }, 100)
+  }
+
+  // Helper para regenerar con colores específicos
+  const generarGraficoConColores = async (vars, target, bubbleColor, bgColor) => {
+    setGeneratingGraph(true)
+    setError('')
+
+    try {
+      const varsOrdenadas = [...vars]
+
+      if (ordenarPor === 'consumo') {
+        varsOrdenadas.sort((a, b) => b.consumo - a.consumo)
+      } else {
+        varsOrdenadas.sort((a, b) => b.afinidad - a.afinidad)
+      }
+
+      const limit = topN === vars.length ? vars.length : topN
+      let varsParaGrafico = varsOrdenadas.slice(0, limit).filter(v => v.visible)
+
+      varsParaGrafico = varsParaGrafico.filter(v => {
+        const isValid = (
+          v.nombre &&
+          typeof v.consumo === 'number' &&
+          typeof v.afinidad === 'number' &&
+          !isNaN(v.consumo) &&
+          !isNaN(v.afinidad) &&
+          v.consumo > 0 &&
+          v.afinidad > 0
+        )
+        return isValid
+      })
+
+      if (varsParaGrafico.length < 2) {
+        setGraphImage(null)
+        setGeneratingGraph(false)
+        return
+      }
+
+      const response = await axios.post(
+        `${API_URL}/api/afinimap/generar-grafico`,
+        {
+          variables: varsParaGrafico,
+          target_name: target,
+          linea_afinidad: lineaAfinidad,
+          color_burbujas: bubbleColor,
+          color_fondo: bgColor
+        },
+        {
+          responseType: 'blob',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      const imageUrl = URL.createObjectURL(response.data)
+      setGraphImage(imageUrl)
+      setGeneratingGraph(false)
+    } catch (err) {
+      console.error('Error generando gráfico:', err)
+      setGeneratingGraph(false)
+    }
   }
 
   const handleExport = async () => {
