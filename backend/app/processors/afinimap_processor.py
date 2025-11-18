@@ -280,9 +280,10 @@ def generar_afinimap_matplotlib(
 
     # ========== CONFIGURAR FIGURA ==========
 
-    plt.figure(figsize=(14, 9))
+    fig = plt.figure(figsize=(14, 9))
+    fig.patch.set_facecolor('white')  # Fondo general blanco
     ax = plt.gca()
-    ax.set_facecolor(color_fondo)
+    ax.set_facecolor(color_fondo)  # Color de fondo solo para el área del gráfico
 
     # ========== LÍNEAS DE REFERENCIA (4 CUADRANTES) ==========
 
@@ -386,7 +387,7 @@ def generar_afinimap_matplotlib(
         format='png',
         dpi=300,
         bbox_inches='tight',
-        facecolor=color_fondo
+        facecolor='white'  # Fondo general siempre blanco
     )
     buf.seek(0)
     plt.close()
