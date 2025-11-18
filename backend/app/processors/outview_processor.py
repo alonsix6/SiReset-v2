@@ -174,39 +174,59 @@ class OutViewProcessor:
         Raises:
             ValueError: Si el archivo es inválido
         """
-        logger.info("Iniciando procesamiento de archivo OutView")
+        try:
+            logger.info("=" * 60)
+            logger.info("🚀 INICIANDO PROCESAMIENTO DE ARCHIVO OUTVIEW")
+            logger.info("=" * 60)
 
-        # PASO 1: Leer Excel (CRÍTICO: skiprows=1 porque fila 1 está vacía)
-        self.df = self._leer_excel(file_content)
-        logger.info(f"OutView leído: {len(self.df)} filas, {len(self.df.columns)} columnas")
+            # PASO 1: Leer Excel (CRÍTICO: skiprows=1 porque fila 1 está vacía)
+            logger.info("PASO 1: Leer Excel")
+            self.df = self._leer_excel(file_content)
+            logger.info(f"✅ OutView leído: {len(self.df)} filas, {len(self.df.columns)} columnas")
 
-        # PASO 2-3: Fechas derivadas
-        self.df = self._procesar_fechas(self.df)
-        self.df = self._extraer_mes_nombrebase(self.df)
+            # PASO 2-3: Fechas derivadas
+            logger.info("PASO 2-3: Procesar fechas")
+            self.df = self._procesar_fechas(self.df)
+            self.df = self._extraer_mes_nombrebase(self.df)
 
-        # PASO 4: Identificadores únicos
-        self.df = self._crear_codigo_unico(self.df)
-        self.df = self._crear_codigo_pieza(self.df)
+            # PASO 4: Identificadores únicos
+            logger.info("PASO 4: Crear identificadores únicos")
+            self.df = self._crear_codigo_unico(self.df)
+            self.df = self._crear_codigo_pieza(self.df)
 
-        # PASO 5-6: Denominadores
-        self.df = self._calcular_denominador_1(self.df)
-        self.df = self._calcular_denominador_2(self.df)
+            # PASO 5-6: Denominadores
+            logger.info("PASO 5-6: Calcular denominadores")
+            self.df = self._calcular_denominador_1(self.df)
+            self.df = self._calcular_denominador_2(self.df)
 
-        # PASO 7-15: Tarifas (9 pasos)
-        self.df = self._calcular_tarifas(self.df)
+            # PASO 7-15: Tarifas (9 pasos)
+            logger.info("PASO 7-15: Calcular tarifas")
+            self.df = self._calcular_tarifas(self.df)
 
-        # PASO 16-19: Columnas finales
-        self.df = self._calcular_columnas_finales(self.df)
+            # PASO 16-19: Columnas finales
+            logger.info("PASO 16-19: Calcular columnas finales")
+            self.df = self._calcular_columnas_finales(self.df)
 
-        # PASO 20: Reordenar columnas
-        self.df = self._reordenar_columnas(self.df)
+            # PASO 20: Reordenar columnas
+            logger.info("PASO 20: Reordenar columnas")
+            self.df = self._reordenar_columnas(self.df)
 
-        # PASO 21: Calcular metadatos
-        self._calcular_metadatos()
+            # PASO 21: Calcular metadatos
+            logger.info("PASO 21: Calcular metadatos")
+            self._calcular_metadatos()
 
-        logger.info(f"Procesamiento completado. DataFrame final: {len(self.df)} filas × {len(self.df.columns)} columnas")
+            logger.info("=" * 60)
+            logger.info(f"✅ PROCESAMIENTO COMPLETADO: {len(self.df)} filas × {len(self.df.columns)} columnas")
+            logger.info("=" * 60)
 
-        return self.df
+            return self.df
+
+        except ValueError as ve:
+            logger.error(f"❌ Error de validación: {str(ve)}")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error inesperado en procesamiento: {type(e).__name__}: {str(e)}", exc_info=True)
+            raise ValueError(f"Error procesando archivo OutView: {str(e)}")
 
     def _leer_excel(self, file_content: bytes) -> pd.DataFrame:
         """
@@ -214,42 +234,65 @@ class OutViewProcessor:
 
         CRÍTICO: La fila 1 SIEMPRE está vacía en archivos OutView
         """
-        df = pd.read_excel(
-            io.BytesIO(file_content),
-            skiprows=1  # ⚠️ CRÍTICO: Salta fila 1 vacía
-        )
+        try:
+            logger.info(f"📄 Intentando leer Excel, tamaño: {len(file_content)} bytes")
+            df = pd.read_excel(
+                io.BytesIO(file_content),
+                skiprows=1  # ⚠️ CRÍTICO: Salta fila 1 vacía
+            )
+            logger.info(f"✅ Excel leído: {len(df)} filas, {len(df.columns)} columnas")
+            logger.info(f"📋 Columnas encontradas: {list(df.columns)[:10]}")  # Primeras 10
 
-        return df
+            # Validar columnas mínimas requeridas
+            columnas_requeridas = ['Fecha', 'NombreBase', 'Tarifa S/.', 'Tipo Elemento']
+            columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
+
+            if columnas_faltantes:
+                logger.error(f"❌ Columnas faltantes: {columnas_faltantes}")
+                raise ValueError(f"Archivo OutView inválido. Columnas faltantes: {', '.join(columnas_faltantes)}")
+
+            logger.info("✅ Validación de columnas pasada")
+            return df
+
+        except Exception as e:
+            logger.error(f"❌ Error leyendo Excel: {type(e).__name__}: {str(e)}", exc_info=True)
+            raise ValueError(f"Error leyendo archivo Excel: {str(e)}")
 
     def _procesar_fechas(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Extrae fechas derivadas: AÑO, MES, SEMANA
         """
-        # Convertir Fecha a datetime
-        df['Fecha'] = pd.to_datetime(
-            df['Fecha'],
-            format='%d/%m/%Y',
-            dayfirst=True,
-            errors='coerce'
-        )
+        try:
+            logger.info("🔄 Procesando fechas...")
 
-        fechas_invalidas = df['Fecha'].isna().sum()
-        if fechas_invalidas > 0:
-            logger.warning(f"{fechas_invalidas} fechas inválidas (NaT)")
+            # Convertir Fecha a datetime
+            df['Fecha'] = pd.to_datetime(
+                df['Fecha'],
+                format='%d/%m/%Y',
+                dayfirst=True,
+                errors='coerce'
+            )
 
-        # AÑO
-        df['AÑO'] = df['Fecha'].dt.year
+            fechas_invalidas = df['Fecha'].isna().sum()
+            if fechas_invalidas > 0:
+                logger.warning(f"⚠️ {fechas_invalidas} fechas inválidas (NaT)")
 
-        # SEMANA (ISO)
-        df['SEMANA'] = df['Fecha'].dt.isocalendar().week
+            # AÑO
+            df['AÑO'] = df['Fecha'].dt.year
 
-        # MES (texto español)
-        df['Mes_Codigo'] = df['Fecha'].dt.month
-        df['MES'] = df['Mes_Codigo'].map(self.MESES)
+            # SEMANA (ISO)
+            df['SEMANA'] = df['Fecha'].dt.isocalendar().week
 
-        logger.info("Fechas derivadas agregadas: AÑO, MES, SEMANA")
+            # MES (texto español)
+            df['Mes_Codigo'] = df['Fecha'].dt.month
+            df['MES'] = df['Mes_Codigo'].map(self.MESES)
 
-        return df
+            logger.info("✅ Fechas derivadas agregadas: AÑO, MES, SEMANA")
+            return df
+
+        except Exception as e:
+            logger.error(f"❌ Error procesando fechas: {type(e).__name__}: {str(e)}", exc_info=True)
+            raise ValueError(f"Error procesando fechas: {str(e)}")
 
     def _extraer_mes_nombrebase(self, df: pd.DataFrame) -> pd.DataFrame:
         """
