@@ -93,6 +93,9 @@ export default function AfiniMap({ user }) {
         return
       }
 
+      console.log('Variables extraídas del Excel:', extractedVariables.length)
+      console.log('Primera variable:', extractedVariables[0])
+
       setVariables(extractedVariables)
       setTopN(Math.min(10, extractedVariables.length))
       setLoading(false)
@@ -199,13 +202,39 @@ export default function AfiniMap({ user }) {
       }
 
       const limit = topN === vars.length ? vars.length : topN
-      const varsParaGrafico = varsOrdenadas.slice(0, limit).filter(v => v.visible)
+      let varsParaGrafico = varsOrdenadas.slice(0, limit).filter(v => v.visible)
+
+      // VALIDACIÓN: Filtrar solo variables con datos válidos
+      varsParaGrafico = varsParaGrafico.filter(v => {
+        const isValid = (
+          v.nombre &&
+          typeof v.consumo === 'number' &&
+          typeof v.afinidad === 'number' &&
+          !isNaN(v.consumo) &&
+          !isNaN(v.afinidad) &&
+          v.consumo > 0 &&
+          v.afinidad > 0
+        )
+        if (!isValid) {
+          console.warn('Variable inválida filtrada:', v)
+        }
+        return isValid
+      })
 
       if (varsParaGrafico.length < 2) {
         setGraphImage(null)
         setGeneratingGraph(false)
+        if (varsParaGrafico.length === 0) {
+          setError('No hay variables válidas para mostrar. Verifica los datos del Excel.')
+        }
         return
       }
+
+      console.log('Enviando al backend:', {
+        variables: varsParaGrafico.length,
+        target_name: target,
+        linea_afinidad: lineaAfinidad
+      })
 
       // Llamar al backend para generar el gráfico
       const response = await axios.post(
@@ -231,7 +260,28 @@ export default function AfiniMap({ user }) {
       setGeneratingGraph(false)
     } catch (err) {
       console.error('Error generando gráfico:', err)
-      setError('Error generando el gráfico. Intenta de nuevo.')
+
+      // Mostrar error específico si está disponible
+      let errorMsg = 'Error generando el gráfico. Intenta de nuevo.'
+
+      if (err.response) {
+        console.error('Error response:', err.response.status, err.response.data)
+
+        // Si es un blob error, intentar leerlo como texto
+        if (err.response.data instanceof Blob) {
+          try {
+            const text = await err.response.data.text()
+            const errorData = JSON.parse(text)
+            errorMsg = errorData.detail || errorMsg
+          } catch (e) {
+            console.error('No se pudo parsear error blob')
+          }
+        } else if (err.response.data?.detail) {
+          errorMsg = err.response.data.detail
+        }
+      }
+
+      setError(errorMsg)
       setGeneratingGraph(false)
     }
   }
