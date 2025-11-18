@@ -37,38 +37,30 @@ export default function AfiniMapControls({
       {/* Contenido Colapsable */}
       {isOpen && (
         <div className="space-y-4 animate-fade-in">
-          {/* Top N Variables con Botones */}
+          {/* Top N Variables con Select Dropdown */}
           <div>
             <label className="block text-sm font-semibold text-reset-white mb-2">
               Mostrar Variables
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <select
+              value={topN}
+              onChange={(e) => onTopNChange(Number(e.target.value))}
+              disabled={disabled}
+              className="w-full bg-reset-gray-dark text-reset-white px-3 py-2 rounded border border-reset-gray-light/30 focus:border-reset-cyan focus:outline-none disabled:opacity-50 text-sm font-semibold cursor-pointer"
+            >
               {topOptions.map(option => (
-                <button
+                <option
                   key={option}
-                  onClick={() => onTopNChange(option)}
-                  disabled={disabled || totalVariables < option}
-                  className={`px-3 py-2 rounded border transition-all text-sm font-semibold ${
-                    topN === option
-                      ? 'bg-reset-cyan/20 border-reset-cyan text-reset-cyan'
-                      : 'bg-reset-gray-dark border-reset-gray-light/30 text-reset-gray-light hover:border-reset-cyan/50'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  value={option}
+                  disabled={totalVariables < option}
                 >
                   Top {option}
-                </button>
+                </option>
               ))}
-              <button
-                onClick={() => onTopNChange(totalVariables)}
-                disabled={disabled || totalVariables === 0}
-                className={`px-3 py-2 rounded border transition-all text-sm font-semibold ${
-                  topN === totalVariables
-                    ? 'bg-reset-neon/20 border-reset-neon text-reset-neon'
-                    : 'bg-reset-gray-dark border-reset-gray-light/30 text-reset-gray-light hover:border-reset-neon/50'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                Todas
-              </button>
-            </div>
+              <option value={totalVariables}>
+                Todas ({totalVariables})
+              </option>
+            </select>
           </div>
 
           {/* Ordenar Por */}
