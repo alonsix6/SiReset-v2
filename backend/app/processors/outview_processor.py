@@ -235,9 +235,27 @@ class OutViewProcessor:
         CRÍTICO: La fila 1 SIEMPRE está vacía en archivos OutView
         """
         try:
-            logger.info(f"📄 Intentando leer Excel, tamaño: {len(file_content)} bytes ({len(file_content) / 1024:.2f} KB)")
+            logger.info("=" * 80)
+            logger.info("📄 _leer_excel(): INICIANDO LECTURA DE EXCEL")
+            logger.info("=" * 80)
+            logger.info(f"📊 Tamaño del contenido: {len(file_content)} bytes ({len(file_content) / 1024:.2f} KB)")
+            logger.info(f"📝 Tipo del contenido: {type(file_content)}")
+
+            # Validar que el contenido no esté vacío
+            if not file_content or len(file_content) == 0:
+                logger.error("❌ El contenido del archivo está vacío")
+                raise ValueError("El archivo está vacío")
+
+            # Verificar los primeros bytes para confirmar que es un archivo Excel
+            magic_bytes = file_content[:4]
+            logger.info(f"🔍 Magic bytes (primeros 4 bytes): {magic_bytes.hex()}")
+            if magic_bytes[:2] == b'PK':
+                logger.info("✅ Archivo parece ser un ZIP/XLSX válido (comienza con 'PK')")
+            else:
+                logger.warning(f"⚠️ Archivo no comienza con 'PK' (ZIP signature). Magic bytes: {magic_bytes.hex()}")
 
             # Intentar leer con skiprows=1 primero (formato estándar)
+            logger.info("🔄 Intento 1: Leyendo Excel con skiprows=1...")
             try:
                 df = pd.read_excel(
                     io.BytesIO(file_content),
@@ -246,40 +264,71 @@ class OutViewProcessor:
                 )
                 logger.info(f"✅ Excel leído con skiprows=1: {len(df)} filas, {len(df.columns)} columnas")
             except Exception as e1:
-                logger.warning(f"⚠️ No se pudo leer con skiprows=1: {e1}")
-                logger.info("🔄 Intentando sin skiprows...")
+                logger.warning("=" * 80)
+                logger.warning(f"⚠️ No se pudo leer con skiprows=1")
+                logger.warning(f"   Tipo de error: {type(e1).__name__}")
+                logger.warning(f"   Mensaje: {str(e1)}")
+                logger.warning("=" * 80)
+                logger.info("🔄 Intento 2: Leyendo Excel sin skiprows...")
 
                 # Intentar sin skiprows (algunos archivos pueden no tener fila vacía)
-                df = pd.read_excel(
-                    io.BytesIO(file_content),
-                    engine='openpyxl',
-                    skiprows=0
-                )
-                logger.info(f"✅ Excel leído sin skiprows: {len(df)} filas, {len(df.columns)} columnas")
+                try:
+                    df = pd.read_excel(
+                        io.BytesIO(file_content),
+                        engine='openpyxl',
+                        skiprows=0
+                    )
+                    logger.info(f"✅ Excel leído sin skiprows: {len(df)} filas, {len(df.columns)} columnas")
+                except Exception as e2:
+                    logger.error("=" * 80)
+                    logger.error(f"❌ No se pudo leer el Excel con ningún método")
+                    logger.error(f"   Error con skiprows=1: {type(e1).__name__}: {str(e1)}")
+                    logger.error(f"   Error con skiprows=0: {type(e2).__name__}: {str(e2)}")
+                    logger.error("=" * 80)
+                    raise e2
 
-            logger.info(f"📋 Columnas encontradas ({len(df.columns)}): {list(df.columns)[:15]}")  # Primeras 15
+            logger.info(f"📋 Total de columnas encontradas: {len(df.columns)}")
+            logger.info(f"📋 Primeras 15 columnas: {list(df.columns)[:15]}")
+            if len(df.columns) > 15:
+                logger.info(f"📋 Siguientes columnas: {list(df.columns)[15:30]}")
 
             # Validar que no esté vacío
             if len(df) == 0:
-                logger.error("❌ El archivo está vacío (0 filas)")
+                logger.error("❌ El archivo está vacío (0 filas de datos)")
                 raise ValueError("El archivo Excel no contiene datos")
+            logger.info(f"✅ Archivo contiene {len(df)} filas de datos")
 
             # Validar columnas mínimas requeridas
+            logger.info("🔍 Validando columnas requeridas...")
             columnas_requeridas = ['Fecha', 'NombreBase', 'Tarifa S/.', 'Tipo Elemento']
             columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
 
             if columnas_faltantes:
-                logger.error(f"❌ Columnas faltantes: {columnas_faltantes}")
-                logger.error(f"📋 Columnas disponibles: {list(df.columns)}")
+                logger.error("=" * 80)
+                logger.error(f"❌ COLUMNAS FALTANTES: {columnas_faltantes}")
+                logger.error(f"📋 Columnas requeridas: {columnas_requeridas}")
+                logger.error(f"📋 Columnas disponibles en el archivo ({len(df.columns)}):")
+                for i, col in enumerate(df.columns, 1):
+                    logger.error(f"   {i}. '{col}'")
+                logger.error("=" * 80)
                 raise ValueError(f"Archivo OutView inválido. Columnas faltantes: {', '.join(columnas_faltantes)}")
 
-            logger.info("✅ Validación de columnas pasada")
+            logger.info(f"✅ Todas las columnas requeridas están presentes")
+            logger.info("=" * 80)
+            logger.info("✅ _leer_excel(): LECTURA COMPLETADA EXITOSAMENTE")
+            logger.info("=" * 80)
             return df
 
         except ValueError as ve:
+            logger.error(f"❌ ValueError en _leer_excel(): {str(ve)}")
             raise
         except Exception as e:
-            logger.error(f"❌ Error leyendo Excel: {type(e).__name__}: {str(e)}", exc_info=True)
+            logger.error("=" * 80)
+            logger.error(f"❌ Excepción inesperada en _leer_excel()")
+            logger.error(f"   Tipo: {type(e).__name__}")
+            logger.error(f"   Mensaje: {str(e)}")
+            logger.error(f"   Args: {e.args}")
+            logger.error("=" * 80, exc_info=True)
             raise ValueError(f"Error leyendo archivo Excel: {str(e)}")
 
     def _procesar_fechas(self, df: pd.DataFrame) -> pd.DataFrame:
