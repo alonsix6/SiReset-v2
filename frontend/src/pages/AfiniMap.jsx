@@ -302,8 +302,7 @@ export default function AfiniMap({ user }) {
     setTimeout(() => generarGrafico(), 100)
   }
 
-  const handleColorBurbujasChange = (e) => {
-    const newColor = e.target.value
+  const handleColorBurbujasChange = (newColor) => {
     setColorBurbujas(newColor)
     // Regenerar con el nuevo color inmediatamente
     setTimeout(() => {
@@ -311,8 +310,7 @@ export default function AfiniMap({ user }) {
     }, 100)
   }
 
-  const handleColorFondoChange = (e) => {
-    const newColor = e.target.value
+  const handleColorFondoChange = (newColor) => {
     setColorFondo(newColor)
     // Regenerar con el nuevo color inmediatamente
     setTimeout(() => {
