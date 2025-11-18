@@ -521,24 +521,23 @@ export default function AfiniMap({ user }) {
                   disabled={loading || generatingGraph}
                 />
 
-                {/* Botón Actualizar Gráfico */}
-                <div className="flex justify-center animate-fade-in-up">
+                {/* Botones de Acción */}
+                <div className="flex justify-center gap-4 animate-fade-in-up">
+                  {/* Botón Actualizar Gráfico */}
                   <button
                     onClick={handleActualizarGrafico}
                     disabled={loading || generatingGraph}
-                    className="btn-primary-large group"
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-reset-cyan to-reset-neon text-reset-bg font-semibold rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
                     <RefreshCw size={20} className={generatingGraph ? 'animate-spin' : ''} />
                     <span>Actualizar Gráfico</span>
                   </button>
-                </div>
 
-                {/* Botón Export */}
-                <div className="flex justify-center animate-fade-in-up">
+                  {/* Botón Descargar */}
                   <button
                     onClick={handleExport}
                     disabled={exporting || !graphImage}
-                    className="btn-primary-large group"
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-reset-purple to-reset-magenta text-white font-semibold rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
                     {exporting ? (
                       <>

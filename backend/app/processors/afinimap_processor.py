@@ -353,8 +353,8 @@ def generar_afinimap_matplotlib(
 
     # ========== CONFIGURAR EJES ==========
 
-    plt.xlabel('Consumo (%)', fontsize=14, fontfamily='Arial', fontweight='normal', color='#000000', labelpad=10)
-    plt.ylabel('Afinidad', fontsize=14, fontfamily='Arial', fontweight='normal', color='#000000', labelpad=10)
+    plt.xlabel('Consumo (%)', fontsize=13, fontfamily='Arial', fontweight='normal', color='#000000', labelpad=10)
+    plt.ylabel('Afinidad', fontsize=13, fontfamily='Arial', fontweight='normal', color='#000000', labelpad=10)
 
     # Aplicar ticks dinámicos
     plt.xticks(x_ticks_valores, [f'{int(x*100)}%' for x in x_ticks_valores], fontsize=12, color='#666666')
@@ -376,7 +376,7 @@ def generar_afinimap_matplotlib(
 
     # ========== TÍTULO ==========
 
-    plt.title(f'AfiniMap - {target_name}', fontsize=14, fontfamily='Arial', fontweight='normal', color='#000000', pad=12)
+    plt.title(f'AfiniMap - {target_name}', fontsize=14, fontfamily='Arial', fontweight='bold', color='#000000', pad=12)
 
     # ========== GUARDAR A BytesIO ==========
 
