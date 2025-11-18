@@ -608,7 +608,7 @@ export default function AfiniMap({ user }) {
                     ) : (
                       <>
                         <Download size={20} />
-                        <span>Descargar PNG (300 DPI)</span>
+                        <span>Descargar PNG</span>
                       </>
                     )}
                   </button>
