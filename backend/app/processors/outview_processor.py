@@ -235,13 +235,34 @@ class OutViewProcessor:
         CRÍTICO: La fila 1 SIEMPRE está vacía en archivos OutView
         """
         try:
-            logger.info(f"📄 Intentando leer Excel, tamaño: {len(file_content)} bytes")
-            df = pd.read_excel(
-                io.BytesIO(file_content),
-                skiprows=1  # ⚠️ CRÍTICO: Salta fila 1 vacía
-            )
-            logger.info(f"✅ Excel leído: {len(df)} filas, {len(df.columns)} columnas")
-            logger.info(f"📋 Columnas encontradas: {list(df.columns)[:10]}")  # Primeras 10
+            logger.info(f"📄 Intentando leer Excel, tamaño: {len(file_content)} bytes ({len(file_content) / 1024:.2f} KB)")
+
+            # Intentar leer con skiprows=1 primero (formato estándar)
+            try:
+                df = pd.read_excel(
+                    io.BytesIO(file_content),
+                    engine='openpyxl',  # Especificar engine explícitamente
+                    skiprows=1  # ⚠️ CRÍTICO: Salta fila 1 vacía
+                )
+                logger.info(f"✅ Excel leído con skiprows=1: {len(df)} filas, {len(df.columns)} columnas")
+            except Exception as e1:
+                logger.warning(f"⚠️ No se pudo leer con skiprows=1: {e1}")
+                logger.info("🔄 Intentando sin skiprows...")
+
+                # Intentar sin skiprows (algunos archivos pueden no tener fila vacía)
+                df = pd.read_excel(
+                    io.BytesIO(file_content),
+                    engine='openpyxl',
+                    skiprows=0
+                )
+                logger.info(f"✅ Excel leído sin skiprows: {len(df)} filas, {len(df.columns)} columnas")
+
+            logger.info(f"📋 Columnas encontradas ({len(df.columns)}): {list(df.columns)[:15]}")  # Primeras 15
+
+            # Validar que no esté vacío
+            if len(df) == 0:
+                logger.error("❌ El archivo está vacío (0 filas)")
+                raise ValueError("El archivo Excel no contiene datos")
 
             # Validar columnas mínimas requeridas
             columnas_requeridas = ['Fecha', 'NombreBase', 'Tarifa S/.', 'Tipo Elemento']
@@ -249,11 +270,14 @@ class OutViewProcessor:
 
             if columnas_faltantes:
                 logger.error(f"❌ Columnas faltantes: {columnas_faltantes}")
+                logger.error(f"📋 Columnas disponibles: {list(df.columns)}")
                 raise ValueError(f"Archivo OutView inválido. Columnas faltantes: {', '.join(columnas_faltantes)}")
 
             logger.info("✅ Validación de columnas pasada")
             return df
 
+        except ValueError as ve:
+            raise
         except Exception as e:
             logger.error(f"❌ Error leyendo Excel: {type(e).__name__}: {str(e)}", exc_info=True)
             raise ValueError(f"Error leyendo archivo Excel: {str(e)}")
@@ -574,60 +598,68 @@ class OutViewProcessor:
         if self.df is None or len(self.df) == 0:
             raise ValueError("No hay datos procesados para generar Excel")
 
-        logger.info("Generando archivo Excel...")
+        logger.info(f"📊 Generando archivo Excel con {len(self.df)} filas...")
 
-        # Crear workbook
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "OutView"
+        try:
+            # Crear workbook (NO usar write_only aquí porque necesitamos formatear)
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "OutView"
+            logger.info("✅ Workbook creado")
 
-        # 1. Fila 1: VACÍA (para mantener compatibilidad)
-        ws.cell(row=1, column=1, value='')
+            # 1. Fila 1: VACÍA (para mantener compatibilidad)
+            ws.cell(row=1, column=1, value='')
 
-        # 2. Escribir metadatos (filas 2-8)
-        metadatos_df = self._crear_dataframe_metadatos()
+            # 2. Escribir metadatos (filas 2-8)
+            metadatos_df = self._crear_dataframe_metadatos()
 
-        for r_idx, row in enumerate(dataframe_to_rows(metadatos_df, index=False, header=False), start=2):
-            for c_idx, value in enumerate(row, start=1):
-                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+            for r_idx, row in enumerate(dataframe_to_rows(metadatos_df, index=False, header=False), start=2):
+                for c_idx, value in enumerate(row, start=1):
+                    cell = ws.cell(row=r_idx, column=c_idx, value=value)
 
-                # Formato para metadatos
-                if c_idx == 1 and r_idx > 2:  # Columna "Descripción" (excepto header)
-                    cell.font = Font(bold=True)
+                    # Formato para metadatos
+                    if c_idx == 1 and r_idx > 2:  # Columna "Descripción" (excepto header)
+                        cell.font = Font(bold=True)
 
-        # 3. Escribir headers (fila 9)
-        header_row = 9
-        for c_idx, col_name in enumerate(self.df.columns, start=1):
-            cell = ws.cell(row=header_row, column=c_idx, value=col_name)
-            cell.font = Font(bold=True, color='FFFFFF')
-            cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-            cell.alignment = Alignment(horizontal='center')
+            # 3. Escribir headers (fila 9)
+            header_row = 9
+            for c_idx, col_name in enumerate(self.df.columns, start=1):
+                cell = ws.cell(row=header_row, column=c_idx, value=col_name)
+                cell.font = Font(bold=True, color='FFFFFF')
+                cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+                cell.alignment = Alignment(horizontal='center')
 
-        # 4. Escribir datos (fila 10+)
-        for r_idx, row in enumerate(dataframe_to_rows(self.df, index=False, header=False), start=10):
-            for c_idx, value in enumerate(row, start=1):
-                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+            # 4. Escribir datos (fila 10+)
+            for r_idx, row in enumerate(dataframe_to_rows(self.df, index=False, header=False), start=10):
+                for c_idx, value in enumerate(row, start=1):
+                    cell = ws.cell(row=r_idx, column=c_idx, value=value)
 
-                # Formato para fechas
-                if c_idx == 1 and isinstance(value, pd.Timestamp):
-                    cell.number_format = 'DD/MM/YYYY'
-                    cell.alignment = Alignment(horizontal='right')
+                    # Formato para fechas
+                    if c_idx == 1 and isinstance(value, pd.Timestamp):
+                        cell.number_format = 'DD/MM/YYYY'
+                        cell.alignment = Alignment(horizontal='right')
 
-                # Formato para números con decimales
-                elif isinstance(value, (int, float)) and not pd.isna(value):
-                    cell.alignment = Alignment(horizontal='right')
+                    # Formato para números con decimales
+                    elif isinstance(value, (int, float)) and not pd.isna(value):
+                        cell.alignment = Alignment(horizontal='right')
 
-        # 5. Ajustar anchos de columna
-        self._ajustar_columnas(ws)
+            # 5. Ajustar anchos de columna
+            self._ajustar_columnas(ws)
 
-        # 6. Guardar en BytesIO
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
+            # 6. Guardar en BytesIO
+            logger.info("💾 Guardando Excel en memoria...")
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
 
-        logger.info("Excel generado exitosamente")
+            excel_size_kb = len(output.getvalue()) / 1024
+            logger.info(f"✅ Excel generado exitosamente: {excel_size_kb:.2f} KB")
 
-        return output
+            return output
+
+        except Exception as e:
+            logger.error(f"❌ Error generando Excel: {type(e).__name__}: {str(e)}", exc_info=True)
+            raise ValueError(f"Error generando archivo Excel: {str(e)}")
 
     def _crear_dataframe_metadatos(self) -> pd.DataFrame:
         """Crea DataFrame de metadatos para las filas 2-8 del Excel"""
