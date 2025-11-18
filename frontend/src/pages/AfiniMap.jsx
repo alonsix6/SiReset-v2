@@ -63,21 +63,15 @@ export default function AfiniMap({ user }) {
             consumo = parseFloat(consumoRaw)
           }
 
-          // Si el valor está en formato decimal (entre 0 y 1), multiplicar por 100
-          // Excel guarda porcentajes como decimales (0.34 en lugar de 34%)
-          if (consumo > 0 && consumo < 1) {
-            consumo = consumo * 100
-          }
+          // Mantener consumo en formato decimal (0-1) para el backend
+          // NO convertir a porcentaje aquí
 
           const nextRow = jsonData[i + 1]
           if (nextRow && nextRow[1] === 'Afinidad') {
             let afinidadRaw = nextRow[3]
             let afinidad = parseFloat(afinidadRaw)
 
-            // Afinidad también puede venir como decimal en algunos casos
-            if (afinidad > 0 && afinidad < 1) {
-              afinidad = afinidad * 100
-            }
+            // Afinidad se mantiene como está (no se multiplica)
 
             if (!isNaN(consumo) && !isNaN(afinidad) && consumo > 0 && nombre) {
               extractedVariables.push({
