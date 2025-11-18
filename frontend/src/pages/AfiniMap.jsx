@@ -187,21 +187,32 @@ export default function AfiniMap({ user }) {
 
   // ========== GENERAR GRÁFICO CON MATPLOTLIB BACKEND ==========
 
-  const generarGrafico = async (vars = variables, target = targetName) => {
+  const generarGrafico = async (
+    vars = variables,
+    target = targetName,
+    customTopN = null,
+    customOrdenarPor = null,
+    customLineaAfinidad = null
+  ) => {
     setGeneratingGraph(true)
     setError('')
 
     try {
+      // Usar valores custom o del estado
+      const topNActual = customTopN !== null ? customTopN : topN
+      const ordenarPorActual = customOrdenarPor !== null ? customOrdenarPor : ordenarPor
+      const lineaAfinidadActual = customLineaAfinidad !== null ? customLineaAfinidad : lineaAfinidad
+
       // Filtrar y ordenar variables
       const varsOrdenadas = [...vars]
 
-      if (ordenarPor === 'consumo') {
+      if (ordenarPorActual === 'consumo') {
         varsOrdenadas.sort((a, b) => b.consumo - a.consumo)
       } else {
         varsOrdenadas.sort((a, b) => b.afinidad - a.afinidad)
       }
 
-      const limit = topN === vars.length ? vars.length : topN
+      const limit = topNActual === vars.length ? vars.length : topNActual
       let varsParaGrafico = varsOrdenadas.slice(0, limit).filter(v => v.visible)
 
       // VALIDACIÓN: Filtrar solo variables con datos válidos
@@ -233,7 +244,7 @@ export default function AfiniMap({ user }) {
       console.log('Enviando al backend:', {
         variables: varsParaGrafico.length,
         target_name: target,
-        linea_afinidad: lineaAfinidad
+        linea_afinidad: lineaAfinidadActual
       })
 
       // Llamar al backend para generar el gráfico
@@ -242,7 +253,7 @@ export default function AfiniMap({ user }) {
         {
           variables: varsParaGrafico,
           target_name: target,
-          linea_afinidad: lineaAfinidad,
+          linea_afinidad: lineaAfinidadActual,
           color_burbujas: colorBurbujas,
           color_fondo: colorFondo
         },
@@ -289,17 +300,20 @@ export default function AfiniMap({ user }) {
   // Regenerar gráfico cuando cambian los parámetros
   const handleTopNChange = (newTopN) => {
     setTopN(newTopN)
-    setTimeout(() => generarGrafico(), 100)
+    // Pasar el nuevo valor directamente para evitar delay de React state
+    generarGrafico(variables, targetName, newTopN, null, null)
   }
 
   const handleOrdenarPorChange = (newOrdenar) => {
     setOrdenarPor(newOrdenar)
-    setTimeout(() => generarGrafico(), 100)
+    // Pasar el nuevo valor directamente para evitar delay de React state
+    generarGrafico(variables, targetName, null, newOrdenar, null)
   }
 
   const handleLineaAfinidadChange = (newLinea) => {
     setLineaAfinidad(newLinea)
-    setTimeout(() => generarGrafico(), 100)
+    // Pasar el nuevo valor directamente para evitar delay de React state
+    generarGrafico(variables, targetName, null, null, newLinea)
   }
 
   const handleColorBurbujasChange = (newColor) => {
@@ -324,6 +338,7 @@ export default function AfiniMap({ user }) {
     setError('')
 
     try {
+      // Usar valores actuales del estado
       const varsOrdenadas = [...vars]
 
       if (ordenarPor === 'consumo') {
