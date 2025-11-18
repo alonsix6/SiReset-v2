@@ -59,9 +59,10 @@ def verify_token(token: str) -> Optional[dict]:
         try:
             # Decodificar sin verificar firma en modo desarrollo
             payload = jwt.decode(
-                token,
+               token,
+               "",  # Key vacía cuando no se verifica la firma
                 options={"verify_signature": False, "verify_aud": False, "verify_exp": False}
-            )
+             )
             # Si tiene 'sub' y 'email', es probablemente un token válido de Supabase
             if payload.get("sub") and payload.get("email"):
                 return payload
