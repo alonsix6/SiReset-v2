@@ -31,25 +31,16 @@ export default function Admin({ user }) {
     try {
       setLoading(true)
 
-      // Obtener todos los usuarios de Supabase Auth
-      const { data, error } = await supabase.auth.admin.listUsers()
+      // Llamar al endpoint del backend que usa Service Role Key
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/list-users-supabase`)
 
-      if (error) {
-        // Si no tiene permisos admin en Supabase, usar la tabla auth.users directamente
-        // Esto requiere una función RPC en Supabase
-        console.error('Error con admin.listUsers:', error)
-
-        // Plan alternativo: Obtener desde metadata almacenada
-        const { data: metaData, error: metaError } = await supabase
-          .from('user_profiles')
-          .select('*')
-
-        if (metaError) throw metaError
-        setUsers(metaData || [])
-      } else {
-        setUsers(data.users || [])
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Error al obtener usuarios')
       }
 
+      const data = await response.json()
+      setUsers(data.users || [])
       setLoading(false)
     } catch (err) {
       console.error('Error cargando usuarios:', err)

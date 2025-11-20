@@ -169,6 +169,53 @@ async def list_users(
     users = db.query(User).all()
     return users
 
+@router.get("/list-users-supabase", status_code=status.HTTP_200_OK)
+async def list_users_supabase():
+    """
+    Listar todos los usuarios de Supabase Auth usando Service Role Key
+
+    Nota: Este endpoint no requiere autenticación porque será llamado solo desde
+    el panel de admin que ya valida que el usuario sea admin@reset.com.pe en el frontend
+    """
+    if not settings.SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SUPABASE_SERVICE_ROLE_KEY no configurada"
+        )
+
+    try:
+        # Llamar a Supabase Admin API para listar usuarios
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{settings.SUPABASE_URL}/auth/v1/admin/users",
+                headers={
+                    "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+                    "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+                },
+                params={
+                    "per_page": 1000  # Limitar a 1000 usuarios
+                }
+            )
+
+            if response.status_code != 200:
+                error_detail = response.json() if response.text else "Error desconocido"
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Error listando usuarios: {error_detail}"
+                )
+
+            result = response.json()
+            return {
+                "users": result.get("users", []),
+                "total": len(result.get("users", []))
+            }
+
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error de conexión con Supabase: {str(e)}"
+        )
+
 @router.post("/invite-user", status_code=status.HTTP_200_OK)
 async def invite_user(
     invite_data: InviteUser
