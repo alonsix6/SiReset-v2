@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 export default function CreatePassword() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -13,13 +14,41 @@ export default function CreatePassword() {
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
+    // Verificar si hay error en el hash (ej: #error=otp_expired)
+    const checkForErrors = () => {
+      const hash = window.location.hash
+      if (hash.includes('error=')) {
+        const params = new URLSearchParams(hash.substring(1))
+        const errorCode = params.get('error_code')
+        const errorDescription = params.get('error_description')
+
+        if (errorCode === 'otp_expired' || errorDescription?.includes('expired')) {
+          setError('El link de invitación ha expirado. Por favor, solicita una nueva invitación al administrador.')
+          setLoading(false)
+          return true
+        }
+
+        if (params.get('error') === 'access_denied') {
+          setError('El link de invitación es inválido o ya fue usado. Por favor, solicita una nueva invitación.')
+          setLoading(false)
+          return true
+        }
+      }
+      return false
+    }
+
     // Verificar que el usuario esté autenticado (viene del link de invitación)
     const checkAuth = async () => {
       try {
+        // Primero verificar si hay errores en la URL
+        if (checkForErrors()) {
+          return
+        }
+
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error || !session) {
-          setError('Link inválido o expirado. Solicita una nueva invitación.')
+          setError('Link inválido o expirado. Solicita una nueva invitación al administrador.')
           setLoading(false)
           return
         }
@@ -42,7 +71,7 @@ export default function CreatePassword() {
     }
 
     checkAuth()
-  }, [])
+  }, [location])
 
   const handleCreatePassword = async (e) => {
     e.preventDefault()
@@ -98,6 +127,66 @@ export default function CreatePassword() {
           <div className="flex flex-col items-center space-y-4">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-reset-neon border-t-transparent"></div>
             <div className="text-xl text-reset-white">Verificando invitación...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Si hay error de verificación (link expirado, inválido, etc.)
+  if (error && !email) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-reset-black relative overflow-hidden">
+        {/* Background Decorative Elements */}
+        <div className="absolute inset-0 overflow-hidden opacity-20">
+          <div className="absolute top-20 right-20 w-96 h-96 border border-reset-magenta rounded-full"></div>
+          <div className="absolute bottom-20 left-20 w-72 h-72 border border-reset-cyan rounded-full"></div>
+        </div>
+
+        <div className="relative z-10 w-full max-w-md px-6">
+          <div className="bg-reset-gray-dark border border-reset-magenta rounded-reset p-8 lg:p-10 shadow-reset-lg">
+            {/* Error Icon */}
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-reset-magenta bg-opacity-20 rounded-full flex items-center justify-center mx-auto border-2 border-reset-magenta mb-4">
+                <span className="text-reset-magenta text-3xl">⚠</span>
+              </div>
+              <h2 className="font-display text-2xl lg:text-3xl text-reset-white uppercase mb-3">
+                Link <span className="text-reset-magenta">Expirado</span>
+              </h2>
+            </div>
+
+            {/* Error Message */}
+            <div className="bg-reset-gray-medium border border-reset-magenta rounded-reset p-4 mb-6">
+              <p className="text-reset-white text-sm leading-relaxed">
+                {error}
+              </p>
+            </div>
+
+            {/* Instructions */}
+            <div className="bg-reset-gray-darker border border-reset-gray rounded-reset p-4 mb-6">
+              <div className="text-reset-gray-light text-xs uppercase tracking-wider mb-2">
+                → Qué hacer ahora
+              </div>
+              <p className="text-reset-gray-light text-sm">
+                Contacta al administrador (<strong className="text-reset-white">admin@reset.com.pe</strong>) para que te envíe una nueva invitación.
+              </p>
+            </div>
+
+            {/* Button to Login */}
+            <button
+              onClick={() => navigate('/')}
+              className="w-full btn-primary"
+            >
+              Volver al Inicio
+            </button>
+          </div>
+
+          {/* Powered by Research */}
+          <div className="mt-6 text-center">
+            <div className="flex items-center justify-center space-x-2">
+              <span className="text-reset-gray-light text-sm">Powered by</span>
+              <span className="font-display text-reset-neon text-xl">RESEARCH</span>
+            </div>
           </div>
         </div>
       </div>
