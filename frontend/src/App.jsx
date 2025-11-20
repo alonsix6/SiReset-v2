@@ -71,13 +71,16 @@ function App() {
     // Verificar sesión actual de Supabase
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        // Forzar rol admin si el email es admin@reset.com.pe
+        const isMainAdmin = session.user.email === 'admin@reset.com.pe'
+
         const userData = {
           id: session.user.id,
           email: session.user.email,
           name: session.user.user_metadata?.name ||
                 session.user.user_metadata?.full_name ||
                 session.user.email,
-          role: session.user.user_metadata?.role || 'user',
+          role: isMainAdmin ? 'admin' : (session.user.user_metadata?.role || 'user'),
           active: true,
           modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox', 'AfiniMap']
         }
@@ -93,13 +96,16 @@ function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        // Forzar rol admin si el email es admin@reset.com.pe
+        const isMainAdmin = session.user.email === 'admin@reset.com.pe'
+
         const userData = {
           id: session.user.id,
           email: session.user.email,
           name: session.user.user_metadata?.name ||
                 session.user.user_metadata?.full_name ||
                 session.user.email,
-          role: session.user.user_metadata?.role || 'user',
+          role: isMainAdmin ? 'admin' : (session.user.user_metadata?.role || 'user'),
           active: true,
           modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox', 'AfiniMap']
         }
