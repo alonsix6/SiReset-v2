@@ -6,6 +6,17 @@ export default function Admin({ user }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Estados para invitación de usuarios
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteName, setInviteName] = useState('')
+  const [inviting, setInviting] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const [inviteSuccess, setInviteSuccess] = useState('')
+
+  // Verificar si el usuario actual es admin@reset.com.pe
+  const isMainAdmin = user?.email === 'admin@reset.com.pe'
+
   // Verificar que el usuario sea admin
   useEffect(() => {
     if (user?.role !== 'admin') {
@@ -80,6 +91,52 @@ export default function Admin({ user }) {
       fetchUsers()
     } catch (err) {
       alert('Error actualizando módulos: ' + err.message)
+    }
+  }
+
+  const handleInviteUser = async (e) => {
+    e.preventDefault()
+    setInviteError('')
+    setInviteSuccess('')
+    setInviting(true)
+
+    try {
+      // Llamar al endpoint backend para invitar usuario
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/invite-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          name: inviteName.trim()
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Error invitando usuario')
+      }
+
+      setInviteSuccess(`¡Invitación enviada a ${inviteEmail}!`)
+      setInviteEmail('')
+      setInviteName('')
+
+      // Actualizar lista de usuarios
+      fetchUsers()
+
+      // Cerrar modal después de 2 segundos
+      setTimeout(() => {
+        setShowInviteModal(false)
+        setInviteSuccess('')
+      }, 2000)
+
+    } catch (err) {
+      console.error('Error invitando usuario:', err)
+      setInviteError(err.message || 'Error al invitar usuario')
+    } finally {
+      setInviting(false)
     }
   }
 
@@ -188,8 +245,30 @@ export default function Admin({ user }) {
           </div>
         </div>
 
+        {/* Panel de Invitación (solo para admin@reset.com.pe) */}
+        {isMainAdmin && (
+          <div className="card-reset-shadow mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="font-display text-2xl lg:text-3xl text-reset-white uppercase mb-2">
+                  Invitar <span className="text-reset-neon">Usuario</span>
+                </h2>
+                <p className="text-reset-gray-light text-sm">
+                  Envía una invitación por email para que el usuario cree su cuenta
+                </p>
+              </div>
+              <button
+                onClick={() => setShowInviteModal(true)}
+                className="btn-primary whitespace-nowrap"
+              >
+                + Invitar Usuario
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Tabla de usuarios */}
-        <div className="card-reset-shadow mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+        <div className="card-reset-shadow mb-8 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
           <div className="mb-4 lg:mb-6">
             <h2 className="font-display text-2xl lg:text-3xl text-reset-white uppercase">
               Usuarios <span className="text-reset-neon">Registrados</span>
@@ -222,7 +301,7 @@ export default function Admin({ user }) {
         </div>
 
         {/* Información sobre roles */}
-        <div className="bg-reset-gray-dark border-l-4 border-reset-cyan rounded-reset p-6 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+        <div className="bg-reset-gray-dark border-l-4 border-reset-cyan rounded-reset p-6 animate-fade-in-up" style={{ animationDelay: '0.35s' }}>
           <div className="flex items-start space-x-4">
             <div className="flex-shrink-0">
               <div className="w-10 h-10 bg-reset-cyan bg-opacity-20 rounded-full flex items-center justify-center">
@@ -257,6 +336,124 @@ export default function Admin({ user }) {
           </div>
         </div>
       </div>
+
+      {/* Modal de Invitación */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 px-4">
+          <div className="bg-reset-gray-dark border border-reset-neon rounded-reset p-6 lg:p-8 max-w-md w-full shadow-reset-lg animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-2xl text-reset-white uppercase">
+                Invitar <span className="text-reset-neon">Usuario</span>
+              </h3>
+              <button
+                onClick={() => {
+                  setShowInviteModal(false)
+                  setInviteError('')
+                  setInviteSuccess('')
+                }}
+                className="text-reset-gray-light hover:text-reset-white text-2xl transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleInviteUser} className="space-y-4">
+              {/* Email */}
+              <div>
+                <label htmlFor="invite-email" className="block text-sm font-semibold text-reset-white mb-2 uppercase tracking-wide">
+                  Email
+                </label>
+                <input
+                  id="invite-email"
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  required
+                  placeholder="usuario@empresa.com"
+                  className="input-reset"
+                  disabled={inviting}
+                />
+              </div>
+
+              {/* Nombre */}
+              <div>
+                <label htmlFor="invite-name" className="block text-sm font-semibold text-reset-white mb-2 uppercase tracking-wide">
+                  Nombre Completo
+                </label>
+                <input
+                  id="invite-name"
+                  type="text"
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  required
+                  placeholder="Juan Pérez"
+                  className="input-reset"
+                  disabled={inviting}
+                />
+              </div>
+
+              {/* Info */}
+              <div className="bg-reset-gray-medium border border-reset-gray rounded-reset p-4">
+                <p className="text-reset-gray-light text-xs">
+                  El usuario recibirá un email con un link para crear su contraseña. Tendrá acceso a todos los módulos por defecto.
+                </p>
+              </div>
+
+              {/* Error */}
+              {inviteError && (
+                <div className="alert-error animate-fade-in">
+                  <div className="flex items-center">
+                    <span className="mr-2">⚠</span>
+                    <span>{inviteError}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Success */}
+              {inviteSuccess && (
+                <div className="bg-reset-neon bg-opacity-10 border border-reset-neon rounded-reset p-3 animate-fade-in">
+                  <div className="flex items-center text-reset-neon text-sm">
+                    <span className="mr-2">✓</span>
+                    <span>{inviteSuccess}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Botones */}
+              <div className="flex space-x-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={inviting}
+                  className={`flex-1 ${inviting ? 'btn-disabled' : 'btn-primary'}`}
+                >
+                  {inviting ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-reset-black border-t-transparent mr-2"></div>
+                      Enviando...
+                    </div>
+                  ) : (
+                    'Enviar Invitación'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInviteModal(false)
+                    setInviteError('')
+                    setInviteSuccess('')
+                  }}
+                  disabled={inviting}
+                  className="px-6 py-3 bg-reset-gray-medium text-reset-white font-bold uppercase text-sm rounded-reset hover:bg-reset-gray transition-all disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
