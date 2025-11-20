@@ -4,6 +4,7 @@ import axios from 'axios'
 import { supabase } from './lib/supabaseClient'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
+import CreatePassword from './pages/CreatePassword'
 import Dashboard from './pages/Dashboard'
 import Mougli from './pages/Mougli'
 import Mapito from './pages/Mapito'
@@ -146,6 +147,7 @@ function App() {
     return (
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/crear-password" element={<CreatePassword />} />
         <Route path="*" element={<Login onLogin={handleLogin} />} />
       </Routes>
     )

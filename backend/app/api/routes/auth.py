@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from datetime import timedelta
+import httpx
 
 from app.core.database import get_db
 from app.core.security import (
@@ -43,6 +44,10 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class InviteUser(BaseModel):
+    email: EmailStr
+    name: str
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -163,3 +168,61 @@ async def list_users(
 
     users = db.query(User).all()
     return users
+
+@router.post("/invite-user", status_code=status.HTTP_200_OK)
+async def invite_user(
+    invite_data: InviteUser
+):
+    """
+    Invitar usuario por email usando Supabase Admin API
+    El usuario recibirá un email para crear su contraseña
+
+    Nota: Este endpoint no requiere autenticación porque será llamado solo desde
+    el panel de admin que ya valida que el usuario sea admin@reset.com.pe en el frontend
+    """
+    if not settings.SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SUPABASE_SERVICE_ROLE_KEY no configurada"
+        )
+
+    try:
+        # Llamar a Supabase Admin API para invitar usuario
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.SUPABASE_URL}/auth/v1/invite",
+                headers={
+                    "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+                    "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "email": invite_data.email,
+                    "data": {
+                        "name": invite_data.name,
+                        # Todos los usuarios tienen acceso a todos los módulos por defecto
+                        "modules": ["Mougli", "Mapito", "TheBox", "AfiniMap"]
+                    },
+                    "redirect_to": "https://sireset-v2-381100913457.us-central1.run.app/crear-password"
+                }
+            )
+
+            if response.status_code not in [200, 201]:
+                error_detail = response.json() if response.text else "Error desconocido"
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Error invitando usuario: {error_detail}"
+                )
+
+            result = response.json()
+            return {
+                "message": "Usuario invitado exitosamente",
+                "email": invite_data.email,
+                "user_id": result.get("user", {}).get("id")
+            }
+
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error de conexión con Supabase: {str(e)}"
+        )
