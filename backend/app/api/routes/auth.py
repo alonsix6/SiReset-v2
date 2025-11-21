@@ -4,6 +4,7 @@ Endpoints de autenticación con JWT
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from datetime import timedelta
@@ -51,6 +52,28 @@ class InviteUser(BaseModel):
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+@router.get("/verify-invite")
+async def verify_invite(token: str, type: str = "invite"):
+    """
+    Endpoint proxy para verificación de invitaciones
+    Redirige a Supabase con el token y redirect_to
+
+    Esto evita problemas con filtros de spam que detectan URLs largas sin vocales
+    """
+    # URL de redirect después de la verificación
+    redirect_to = "https://sireset-v2-381100913457.us-central1.run.app/crear-password"
+
+    # Construir URL de Supabase
+    supabase_verify_url = (
+        f"{settings.SUPABASE_URL}/auth/v1/verify"
+        f"?token={token}"
+        f"&type={type}"
+        f"&redirect_to={redirect_to}"
+    )
+
+    # Redirigir al usuario
+    return RedirectResponse(url=supabase_verify_url, status_code=302)
 
 @router.post("/login", response_model=Token)
 async def login(
