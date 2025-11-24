@@ -307,6 +307,10 @@ export default function Mapito({ user }) {
 
     setExporting(true)
 
+    let tempDiv = null
+    let tempMap = null
+    let overlay = null
+
     try {
       // Obtener features seleccionados
       const selectedFeatures = geoData.features.filter(f => isSelected(f))
@@ -323,22 +327,40 @@ export default function Mapito({ user }) {
         features: selectedFeatures
       }
 
-      // Crear un contenedor temporal más grande para evitar cortes
-      const tempDiv = document.createElement('div')
+      // Crear un contenedor temporal VISIBLE para que Leaflet renderice correctamente
+      tempDiv = document.createElement('div')
       tempDiv.style.width = '2400px'
       tempDiv.style.height = '2400px'
-      tempDiv.style.position = 'absolute'
-      tempDiv.style.left = '-9999px'
-      tempDiv.style.top = '-9999px'  // Mover completamente fuera del viewport
+      tempDiv.style.position = 'fixed'
+      tempDiv.style.left = '50%'
+      tempDiv.style.top = '50%'
+      tempDiv.style.transform = 'translate(-50%, -50%)'
+      tempDiv.style.zIndex = '9999'
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
+      tempDiv.style.boxShadow = '0 0 20px rgba(0,0,0,0.3)'
+
+      // Crear overlay oscuro detrás
+      overlay = document.createElement('div')
+      overlay.style.position = 'fixed'
+      overlay.style.top = '0'
+      overlay.style.left = '0'
+      overlay.style.width = '100%'
+      overlay.style.height = '100%'
+      overlay.style.backgroundColor = 'rgba(0,0,0,0.7)'
+      overlay.style.zIndex = '9998'
+
+      document.body.appendChild(overlay)
       document.body.appendChild(tempDiv)
 
       // Crear mapa temporal
-      const tempMap = L.map(tempDiv, {
+      tempMap = L.map(tempDiv, {
         zoomControl: false,
         attributionControl: false,
         preferCanvas: false
       }).setView([-9.2, -75.0], 5)
+
+      // IMPORTANTE: Forzar a Leaflet a recalcular el tamaño del contenedor
+      tempMap.invalidateSize()
 
       // Asegurar que el contenedor de Leaflet tenga fondo transparente
       const leafletContainer = tempDiv.querySelector('.leaflet-container')
@@ -377,23 +399,27 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      // Ajustar vista - Calcular bounds SOLO sobre las áreas seleccionadas
-      // Esto asegura que el zoom y centro estén enfocados en la selección,
-      // incluso cuando se renderiza el contexto completo
-      const selectedGeoJson = L.geoJSON(selectedData)
-      const bounds = selectedGeoJson.getBounds()
+      // Ajustar vista - VOLVER A LA LÓGICA SIMPLE QUE FUNCIONABA
+      const bounds = geoJsonLayer.getBounds()
       const padding = showBasemap ? [100, 100] : [50, 50]  // Padding moderado
       tempMap.fitBounds(bounds, {
         padding: padding,
         maxZoom: 18
       })
 
+      // Forzar actualización del mapa después de agregar las capas
+      tempMap.invalidateSize()
+
       // Esperar a que se carguen los tiles si el basemap está activo
+      // Aumentamos el tiempo de espera para asegurar que todo se renderice correctamente
       if (showBasemap) {
         await new Promise(resolve => setTimeout(resolve, 2500))
       } else {
         await new Promise(resolve => setTimeout(resolve, 800))
       }
+
+      // Una última invalidación antes de capturar
+      tempMap.invalidateSize()
 
       // Importar html2canvas dinámicamente
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
@@ -477,12 +503,25 @@ export default function Mapito({ user }) {
         // Limpiar
         tempMap.remove()
         document.body.removeChild(tempDiv)
+        document.body.removeChild(overlay)
         setExporting(false)
       }, 'image/png')
 
     } catch (err) {
       console.error('Error exportando mapa:', err)
       alert('Error al exportar el mapa. Por favor, intenta nuevamente.')
+
+      // Limpiar elementos si fueron creados
+      if (tempMap) {
+        try { tempMap.remove() } catch (e) {}
+      }
+      if (tempDiv && tempDiv.parentNode) {
+        document.body.removeChild(tempDiv)
+      }
+      if (overlay && overlay.parentNode) {
+        document.body.removeChild(overlay)
+      }
+
       setExporting(false)
     }
   }
@@ -498,6 +537,10 @@ export default function Mapito({ user }) {
     }
 
     setExporting(true)
+
+    let tempDiv = null
+    let tempMap = null
+    let overlay = null
 
     try {
       // Obtener features seleccionados
@@ -515,22 +558,40 @@ export default function Mapito({ user }) {
         features: selectedFeatures
       }
 
-      // Crear un contenedor temporal más grande para evitar cortes
-      const tempDiv = document.createElement('div')
+      // Crear un contenedor temporal VISIBLE para que Leaflet renderice correctamente
+      tempDiv = document.createElement('div')
       tempDiv.style.width = '2400px'
       tempDiv.style.height = '2400px'
-      tempDiv.style.position = 'absolute'
-      tempDiv.style.left = '-9999px'
-      tempDiv.style.top = '-9999px'  // Mover completamente fuera del viewport
+      tempDiv.style.position = 'fixed'
+      tempDiv.style.left = '50%'
+      tempDiv.style.top = '50%'
+      tempDiv.style.transform = 'translate(-50%, -50%)'
+      tempDiv.style.zIndex = '9999'
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
+      tempDiv.style.boxShadow = '0 0 20px rgba(0,0,0,0.3)'
+
+      // Crear overlay oscuro detrás
+      overlay = document.createElement('div')
+      overlay.style.position = 'fixed'
+      overlay.style.top = '0'
+      overlay.style.left = '0'
+      overlay.style.width = '100%'
+      overlay.style.height = '100%'
+      overlay.style.backgroundColor = 'rgba(0,0,0,0.7)'
+      overlay.style.zIndex = '9998'
+
+      document.body.appendChild(overlay)
       document.body.appendChild(tempDiv)
 
       // Crear mapa temporal
-      const tempMap = L.map(tempDiv, {
+      tempMap = L.map(tempDiv, {
         zoomControl: false,
         attributionControl: false,
         preferCanvas: false
       }).setView([-9.2, -75.0], 5)
+
+      // IMPORTANTE: Forzar a Leaflet a recalcular el tamaño del contenedor
+      tempMap.invalidateSize()
 
       // Asegurar que el contenedor de Leaflet tenga fondo transparente
       const leafletContainer = tempDiv.querySelector('.leaflet-container')
@@ -569,23 +630,27 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      // Ajustar vista - Calcular bounds SOLO sobre las áreas seleccionadas
-      // Esto asegura que el zoom y centro estén enfocados en la selección,
-      // incluso cuando se renderiza el contexto completo
-      const selectedGeoJson = L.geoJSON(selectedData)
-      const bounds = selectedGeoJson.getBounds()
+      // Ajustar vista
+      const bounds = geoJsonLayer.getBounds()
       const padding = showBasemap ? [100, 100] : [50, 50]
       tempMap.fitBounds(bounds, {
         padding: padding,
         maxZoom: 18
       })
 
+      // Forzar actualización del mapa después de agregar las capas
+      tempMap.invalidateSize()
+
       // Esperar a que se carguen los tiles si el basemap está activo
+      // Aumentamos el tiempo de espera para asegurar que todo se renderice correctamente
       if (showBasemap) {
         await new Promise(resolve => setTimeout(resolve, 2500))
       } else {
         await new Promise(resolve => setTimeout(resolve, 800))
       }
+
+      // Una última invalidación antes de capturar
+      tempMap.invalidateSize()
 
       // Importar html2canvas dinámicamente
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
@@ -684,6 +749,18 @@ export default function Mapito({ user }) {
     } catch (err) {
       console.error('Error copiando mapa:', err)
       alert('Error al copiar el mapa. Por favor, intenta nuevamente.')
+
+      // Limpiar elementos si fueron creados
+      if (tempMap) {
+        try { tempMap.remove() } catch (e) {}
+      }
+      if (tempDiv && tempDiv.parentNode) {
+        document.body.removeChild(tempDiv)
+      }
+      if (overlay && overlay.parentNode) {
+        document.body.removeChild(overlay)
+      }
+
       setExporting(false)
     }
   }
