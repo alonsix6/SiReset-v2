@@ -186,6 +186,8 @@ function App() {
       <Route path="/benchbox" element={
         <Layout user={user} onLogout={handleLogout}>
           <BenchBox user={user} />
+        </Layout>
+      } />
       <Route path="/afinimap" element={
         <Layout user={user} onLogout={handleLogout}>
           <AfiniMap user={user} />
