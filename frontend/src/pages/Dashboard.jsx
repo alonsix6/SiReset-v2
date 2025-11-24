@@ -28,6 +28,15 @@ export default function Dashboard({ user }) {
       gradient: 'from-reset-magenta to-reset-purple',
       borderColor: 'border-reset-magenta',
       path: '/thebox'
+    },
+    {
+      code: 'BenchBox',
+      title: 'BENCHBOX',
+      description: 'Benchmarking de costos de medios digitales y calculadora de presupuestos',
+      icon: '▶',
+      gradient: 'from-purple-500 to-reset-purple',
+      borderColor: 'border-reset-purple',
+      path: '/benchbox'
     }
   ]
 

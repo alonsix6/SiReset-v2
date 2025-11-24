@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Mougli from './pages/Mougli'
 import Mapito from './pages/Mapito'
 import TheBox from './pages/TheBox'
+import BenchBox from './pages/BenchBox'
 import Admin from './pages/Admin'
 import Layout from './components/Layout'
 
@@ -171,6 +172,11 @@ function App() {
       <Route path="/thebox" element={
         <Layout user={user} onLogout={handleLogout}>
           <TheBox user={user} />
+        </Layout>
+      } />
+      <Route path="/benchbox" element={
+        <Layout user={user} onLogout={handleLogout}>
+          <BenchBox user={user} />
         </Layout>
       } />
       <Route path="/admin" element={
