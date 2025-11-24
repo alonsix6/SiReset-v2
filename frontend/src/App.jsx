@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import Mougli from './pages/Mougli'
 import Mapito from './pages/Mapito'
 import TheBox from './pages/TheBox'
+import BenchBox from './pages/BenchBox'
 import AfiniMap from './pages/AfiniMap'
 import Admin from './pages/Admin'
 import Layout from './components/Layout'
@@ -182,6 +183,9 @@ function App() {
           <TheBox user={user} />
         </Layout>
       } />
+      <Route path="/benchbox" element={
+        <Layout user={user} onLogout={handleLogout}>
+          <BenchBox user={user} />
       <Route path="/afinimap" element={
         <Layout user={user} onLogout={handleLogout}>
           <AfiniMap user={user} />

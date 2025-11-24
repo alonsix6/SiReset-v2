@@ -30,6 +30,13 @@ export default function Dashboard({ user }) {
       path: '/thebox'
     },
     {
+      code: 'BenchBox',
+      title: 'BENCHBOX',
+      description: 'Benchmarking de costos de medios digitales y calculadora de presupuestos',
+      icon: '▶',
+      gradient: 'from-purple-500 to-reset-purple',
+      borderColor: 'border-reset-purple',
+      path: '/benchbox'
       code: 'AfiniMap',
       title: 'AFINIMAP',
       description: 'Mapas de afinidad TGI - Scatter plots de consumo y afinidad',

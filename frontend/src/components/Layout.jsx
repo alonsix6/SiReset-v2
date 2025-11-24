@@ -15,6 +15,7 @@ export default function Layout({ user, onLogout, children }) {
     { name: 'Mougli', path: '/mougli', icon: '▶' },
     { name: 'Mapito', path: '/mapito', icon: '▶' },
     { name: 'The Box', path: '/thebox', icon: '▶' },
+    { name: 'BenchBox', path: '/benchbox', icon: '▶' },
     { name: 'AfiniMap', path: '/afinimap', icon: '▶' },
   ]
 
