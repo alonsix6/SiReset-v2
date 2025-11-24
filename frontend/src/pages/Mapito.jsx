@@ -38,6 +38,8 @@ export default function Mapito({ user }) {
   const [showBorders, setShowBorders] = useState(true)
   const [showBasemap, setShowBasemap] = useState(true)
   const [includeContext, setIncludeContext] = useState(false)  // Incluir mapa completo para contexto
+  const [showExportMenu, setShowExportMenu] = useState(false)  // Controlar dropdown de exportar
+  const [showCopyFeedback, setShowCopyFeedback] = useState(false)  // Feedback visual de copiado
 
   // Refs
   const mapRef = useRef(null)
@@ -105,6 +107,18 @@ export default function Mapito({ user }) {
       setAvailableDistricts([])
     }
   }, [selectedProvinces, nivel])
+
+  // Cerrar dropdown cuando se hace clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showExportMenu && !event.target.closest('.export-dropdown-container')) {
+        setShowExportMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
 
   const loadGeoData = async () => {
     setLoading(true)
@@ -466,6 +480,204 @@ export default function Mapito({ user }) {
     } catch (err) {
       console.error('Error exportando mapa:', err)
       alert('Error al exportar el mapa. Por favor, intenta nuevamente.')
+      setExporting(false)
+    }
+  }
+
+  // Copiar mapa al portapapeles
+  const copyToClipboard = async () => {
+    if (!mapRef.current || !geoData) return
+
+    // Verificar si el navegador soporta la Clipboard API
+    if (!navigator.clipboard || !ClipboardItem) {
+      alert('Tu navegador no soporta copiar imágenes al portapapeles. Por favor, usa la opción de descargar.')
+      return
+    }
+
+    setExporting(true)
+
+    try {
+      // Obtener features seleccionados
+      const selectedFeatures = geoData.features.filter(f => isSelected(f))
+
+      if (selectedFeatures.length === 0) {
+        alert('Por favor selecciona al menos un área para copiar')
+        setExporting(false)
+        return
+      }
+
+      // Crear datos solo con features seleccionados
+      const selectedData = {
+        type: 'FeatureCollection',
+        features: selectedFeatures
+      }
+
+      // Crear un contenedor temporal más grande para evitar cortes
+      const tempDiv = document.createElement('div')
+      tempDiv.style.width = '2400px'
+      tempDiv.style.height = '2400px'
+      tempDiv.style.position = 'absolute'
+      tempDiv.style.left = '-9999px'
+      tempDiv.style.top = '0'
+      tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
+      document.body.appendChild(tempDiv)
+
+      // Crear mapa temporal
+      const tempMap = L.map(tempDiv, {
+        zoomControl: false,
+        attributionControl: false,
+        preferCanvas: false
+      }).setView([-9.2, -75.0], 5)
+
+      // Asegurar que el contenedor de Leaflet tenga fondo transparente
+      const leafletContainer = tempDiv.querySelector('.leaflet-container')
+      if (leafletContainer && !showBasemap) {
+        leafletContainer.style.backgroundColor = 'transparent'
+      }
+
+      // Si showBasemap está activo, agregar el mapa base
+      if (showBasemap) {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19
+        }).addTo(tempMap)
+      }
+
+      // Agregar GeoJSON según el contexto
+      const dataToRender = includeContext ? geoData : selectedData
+
+      const geoJsonLayer = L.geoJSON(dataToRender, {
+        style: (feature) => {
+          if (includeContext) {
+            const selected = isSelected(feature)
+            return {
+              fillColor: selected ? colorSelected : colorGeneral,
+              fillOpacity: selected ? 0.95 : 0.85,
+              color: showBorders ? colorBorder : (selected ? colorSelected : colorGeneral),
+              weight: showBorders ? grosorBorde : 0
+            }
+          } else {
+            return {
+              fillColor: colorSelected,
+              fillOpacity: 0.95,
+              color: showBorders ? colorBorder : colorSelected,
+              weight: showBorders ? grosorBorde : 0
+            }
+          }
+        }
+      }).addTo(tempMap)
+
+      // Ajustar vista
+      const bounds = geoJsonLayer.getBounds()
+      const padding = showBasemap ? [100, 100] : [50, 50]
+      tempMap.fitBounds(bounds, {
+        padding: padding,
+        maxZoom: 18
+      })
+
+      // Esperar a que se carguen los tiles si el basemap está activo
+      if (showBasemap) {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
+      // Importar html2canvas dinámicamente
+      const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
+
+      // Capturar el mapa completo
+      const canvas = await html2canvas(tempDiv, {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: showBasemap ? '#ffffff' : null,
+        scale: 1,
+        logging: false,
+        width: 2400,
+        height: 2400
+      })
+
+      // Función para recortar el canvas eliminando áreas transparentes
+      const cropCanvas = (sourceCanvas) => {
+        const ctx = sourceCanvas.getContext('2d')
+        const imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
+        const pixels = imageData.data
+
+        let minX = sourceCanvas.width
+        let minY = sourceCanvas.height
+        let maxX = 0
+        let maxY = 0
+
+        // Encontrar los límites del contenido no transparente
+        for (let y = 0; y < sourceCanvas.height; y++) {
+          for (let x = 0; x < sourceCanvas.width; x++) {
+            const index = (y * sourceCanvas.width + x) * 4
+            const alpha = pixels[index + 3]
+
+            if (alpha > 10) {
+              if (x < minX) minX = x
+              if (x > maxX) maxX = x
+              if (y < minY) minY = y
+              if (y > maxY) maxY = y
+            }
+          }
+        }
+
+        // Agregar margen de seguridad
+        const margin = 20
+        minX = Math.max(0, minX - margin)
+        minY = Math.max(0, minY - margin)
+        maxX = Math.min(sourceCanvas.width - 1, maxX + margin)
+        maxY = Math.min(sourceCanvas.height - 1, maxY + margin)
+
+        const croppedWidth = maxX - minX + 1
+        const croppedHeight = maxY - minY + 1
+
+        // Crear nuevo canvas con el tamaño recortado
+        const croppedCanvas = document.createElement('canvas')
+        croppedCanvas.width = croppedWidth
+        croppedCanvas.height = croppedHeight
+        const croppedCtx = croppedCanvas.getContext('2d')
+
+        // Copiar la región recortada
+        croppedCtx.drawImage(
+          sourceCanvas,
+          minX, minY, croppedWidth, croppedHeight,
+          0, 0, croppedWidth, croppedHeight
+        )
+
+        return croppedCanvas
+      }
+
+      // Recortar solo si no hay basemap (para optimizar tamaño)
+      const finalCanvas = showBasemap ? canvas : cropCanvas(canvas)
+
+      // Convertir a blob y copiar al portapapeles
+      finalCanvas.toBlob(async (blob) => {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ])
+
+          // Mostrar feedback de éxito
+          setShowCopyFeedback(true)
+          setTimeout(() => setShowCopyFeedback(false), 3000)
+
+          // Cerrar el menú dropdown
+          setShowExportMenu(false)
+
+        } catch (clipboardErr) {
+          console.error('Error copiando al portapapeles:', clipboardErr)
+          alert('No se pudo copiar al portapapeles. Por favor, intenta descargar el mapa.')
+        } finally {
+          // Limpiar
+          tempMap.remove()
+          document.body.removeChild(tempDiv)
+          setExporting(false)
+        }
+      }, 'image/png')
+
+    } catch (err) {
+      console.error('Error copiando mapa:', err)
+      alert('Error al copiar el mapa. Por favor, intenta nuevamente.')
       setExporting(false)
     }
   }
@@ -859,14 +1071,37 @@ export default function Mapito({ user }) {
             </div>
 
             {/* Exportar */}
-            <div className="card-reset-shadow animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+            <div className="card-reset-shadow animate-fade-in-up relative export-dropdown-container" style={{ animationDelay: '0.15s' }}>
               <button
-                onClick={exportToPng}
+                onClick={() => setShowExportMenu(!showExportMenu)}
                 disabled={loading || !geoData || exporting}
-                className="w-full px-4 py-3 bg-gradient-to-r from-reset-neon to-green-400 text-reset-black font-bold rounded-reset hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 bg-gradient-to-r from-reset-neon to-green-400 text-reset-black font-bold rounded-reset hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
-                {exporting ? '⏳ Exportando...' : '📥 Descargar PNG'}
+                <span>{exporting ? '⏳ Exportando...' : '⬇️ Exportar Mapa'}</span>
+                {!exporting && <span className="text-sm">▼</span>}
               </button>
+
+              {/* Dropdown menu */}
+              {showExportMenu && !exporting && (
+                <div className="absolute left-0 right-0 mt-2 bg-reset-gray-dark border border-reset-gray-medium rounded-reset shadow-lg z-10 overflow-hidden">
+                  <button
+                    onClick={exportToPng}
+                    className="w-full px-3 py-2 text-left text-reset-white hover:bg-reset-gray-medium transition-colors flex items-center space-x-2 border-b border-reset-gray-medium text-sm"
+                  >
+                    <span>📥</span>
+                    <span className="font-semibold text-reset-neon">Descargar PNG</span>
+                  </button>
+
+                  <button
+                    onClick={copyToClipboard}
+                    className="w-full px-3 py-2 text-left text-reset-white hover:bg-reset-gray-medium transition-colors flex items-center space-x-2 text-sm"
+                  >
+                    <span>📋</span>
+                    <span className="font-semibold text-reset-cyan">Copiar al Portapapeles</span>
+                  </button>
+                </div>
+              )}
+
               <div className="mt-2 space-y-1">
                 <p className="text-reset-gray-light text-xs text-center">
                   {includeContext ? '🗺️ Exportará el mapa completo' : 'Solo exportará las áreas seleccionadas'}
@@ -944,6 +1179,16 @@ export default function Mapito({ user }) {
           </div>
         </div>
       </div>
+
+      {/* Feedback visual de copiado exitoso */}
+      {showCopyFeedback && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
+          <div className="bg-gradient-to-r from-reset-neon to-green-400 text-reset-black px-5 py-3 rounded-reset shadow-2xl flex items-center space-x-2 border-2 border-reset-neon">
+            <span className="text-xl">✅</span>
+            <div className="font-bold text-base">¡Mapito listo!</div>
+          </div>
+        </div>
+      )}
 
       {/* CSS personalizado para tooltips */}
       <style>{`

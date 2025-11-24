@@ -174,39 +174,59 @@ class OutViewProcessor:
         Raises:
             ValueError: Si el archivo es inválido
         """
-        logger.info("Iniciando procesamiento de archivo OutView")
+        try:
+            logger.info("=" * 60)
+            logger.info("🚀 INICIANDO PROCESAMIENTO DE ARCHIVO OUTVIEW")
+            logger.info("=" * 60)
 
-        # PASO 1: Leer Excel (CRÍTICO: skiprows=1 porque fila 1 está vacía)
-        self.df = self._leer_excel(file_content)
-        logger.info(f"OutView leído: {len(self.df)} filas, {len(self.df.columns)} columnas")
+            # PASO 1: Leer Excel (CRÍTICO: skiprows=1 porque fila 1 está vacía)
+            logger.info("PASO 1: Leer Excel")
+            self.df = self._leer_excel(file_content)
+            logger.info(f"✅ OutView leído: {len(self.df)} filas, {len(self.df.columns)} columnas")
 
-        # PASO 2-3: Fechas derivadas
-        self.df = self._procesar_fechas(self.df)
-        self.df = self._extraer_mes_nombrebase(self.df)
+            # PASO 2-3: Fechas derivadas
+            logger.info("PASO 2-3: Procesar fechas")
+            self.df = self._procesar_fechas(self.df)
+            self.df = self._extraer_mes_nombrebase(self.df)
 
-        # PASO 4: Identificadores únicos
-        self.df = self._crear_codigo_unico(self.df)
-        self.df = self._crear_codigo_pieza(self.df)
+            # PASO 4: Identificadores únicos
+            logger.info("PASO 4: Crear identificadores únicos")
+            self.df = self._crear_codigo_unico(self.df)
+            self.df = self._crear_codigo_pieza(self.df)
 
-        # PASO 5-6: Denominadores
-        self.df = self._calcular_denominador_1(self.df)
-        self.df = self._calcular_denominador_2(self.df)
+            # PASO 5-6: Denominadores
+            logger.info("PASO 5-6: Calcular denominadores")
+            self.df = self._calcular_denominador_1(self.df)
+            self.df = self._calcular_denominador_2(self.df)
 
-        # PASO 7-15: Tarifas (9 pasos)
-        self.df = self._calcular_tarifas(self.df)
+            # PASO 7-15: Tarifas (9 pasos)
+            logger.info("PASO 7-15: Calcular tarifas")
+            self.df = self._calcular_tarifas(self.df)
 
-        # PASO 16-19: Columnas finales
-        self.df = self._calcular_columnas_finales(self.df)
+            # PASO 16-19: Columnas finales
+            logger.info("PASO 16-19: Calcular columnas finales")
+            self.df = self._calcular_columnas_finales(self.df)
 
-        # PASO 20: Reordenar columnas
-        self.df = self._reordenar_columnas(self.df)
+            # PASO 20: Reordenar columnas
+            logger.info("PASO 20: Reordenar columnas")
+            self.df = self._reordenar_columnas(self.df)
 
-        # PASO 21: Calcular metadatos
-        self._calcular_metadatos()
+            # PASO 21: Calcular metadatos
+            logger.info("PASO 21: Calcular metadatos")
+            self._calcular_metadatos()
 
-        logger.info(f"Procesamiento completado. DataFrame final: {len(self.df)} filas × {len(self.df.columns)} columnas")
+            logger.info("=" * 60)
+            logger.info(f"✅ PROCESAMIENTO COMPLETADO: {len(self.df)} filas × {len(self.df.columns)} columnas")
+            logger.info("=" * 60)
 
-        return self.df
+            return self.df
+
+        except ValueError as ve:
+            logger.error(f"❌ Error de validación: {str(ve)}")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error inesperado en procesamiento: {type(e).__name__}: {str(e)}", exc_info=True)
+            raise ValueError(f"Error procesando archivo OutView: {str(e)}")
 
     def _leer_excel(self, file_content: bytes) -> pd.DataFrame:
         """
@@ -214,42 +234,138 @@ class OutViewProcessor:
 
         CRÍTICO: La fila 1 SIEMPRE está vacía en archivos OutView
         """
-        df = pd.read_excel(
-            io.BytesIO(file_content),
-            skiprows=1  # ⚠️ CRÍTICO: Salta fila 1 vacía
-        )
+        try:
+            logger.info("=" * 80)
+            logger.info("📄 _leer_excel(): INICIANDO LECTURA DE EXCEL")
+            logger.info("=" * 80)
+            logger.info(f"📊 Tamaño del contenido: {len(file_content)} bytes ({len(file_content) / 1024:.2f} KB)")
+            logger.info(f"📝 Tipo del contenido: {type(file_content)}")
 
-        return df
+            # Validar que el contenido no esté vacío
+            if not file_content or len(file_content) == 0:
+                logger.error("❌ El contenido del archivo está vacío")
+                raise ValueError("El archivo está vacío")
+
+            # Verificar los primeros bytes para confirmar que es un archivo Excel
+            magic_bytes = file_content[:4]
+            logger.info(f"🔍 Magic bytes (primeros 4 bytes): {magic_bytes.hex()}")
+            if magic_bytes[:2] == b'PK':
+                logger.info("✅ Archivo parece ser un ZIP/XLSX válido (comienza con 'PK')")
+            else:
+                logger.warning(f"⚠️ Archivo no comienza con 'PK' (ZIP signature). Magic bytes: {magic_bytes.hex()}")
+
+            # Intentar leer con skiprows=1 primero (formato estándar)
+            logger.info("🔄 Intento 1: Leyendo Excel con skiprows=1...")
+            try:
+                df = pd.read_excel(
+                    io.BytesIO(file_content),
+                    engine='openpyxl',  # Especificar engine explícitamente
+                    skiprows=1  # ⚠️ CRÍTICO: Salta fila 1 vacía
+                )
+                logger.info(f"✅ Excel leído con skiprows=1: {len(df)} filas, {len(df.columns)} columnas")
+            except Exception as e1:
+                logger.warning("=" * 80)
+                logger.warning(f"⚠️ No se pudo leer con skiprows=1")
+                logger.warning(f"   Tipo de error: {type(e1).__name__}")
+                logger.warning(f"   Mensaje: {str(e1)}")
+                logger.warning("=" * 80)
+                logger.info("🔄 Intento 2: Leyendo Excel sin skiprows...")
+
+                # Intentar sin skiprows (algunos archivos pueden no tener fila vacía)
+                try:
+                    df = pd.read_excel(
+                        io.BytesIO(file_content),
+                        engine='openpyxl',
+                        skiprows=0
+                    )
+                    logger.info(f"✅ Excel leído sin skiprows: {len(df)} filas, {len(df.columns)} columnas")
+                except Exception as e2:
+                    logger.error("=" * 80)
+                    logger.error(f"❌ No se pudo leer el Excel con ningún método")
+                    logger.error(f"   Error con skiprows=1: {type(e1).__name__}: {str(e1)}")
+                    logger.error(f"   Error con skiprows=0: {type(e2).__name__}: {str(e2)}")
+                    logger.error("=" * 80)
+                    raise e2
+
+            logger.info(f"📋 Total de columnas encontradas: {len(df.columns)}")
+            logger.info(f"📋 Primeras 15 columnas: {list(df.columns)[:15]}")
+            if len(df.columns) > 15:
+                logger.info(f"📋 Siguientes columnas: {list(df.columns)[15:30]}")
+
+            # Validar que no esté vacío
+            if len(df) == 0:
+                logger.error("❌ El archivo está vacío (0 filas de datos)")
+                raise ValueError("El archivo Excel no contiene datos")
+            logger.info(f"✅ Archivo contiene {len(df)} filas de datos")
+
+            # Validar columnas mínimas requeridas
+            logger.info("🔍 Validando columnas requeridas...")
+            columnas_requeridas = ['Fecha', 'NombreBase', 'Tarifa S/.', 'Tipo Elemento']
+            columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
+
+            if columnas_faltantes:
+                logger.error("=" * 80)
+                logger.error(f"❌ COLUMNAS FALTANTES: {columnas_faltantes}")
+                logger.error(f"📋 Columnas requeridas: {columnas_requeridas}")
+                logger.error(f"📋 Columnas disponibles en el archivo ({len(df.columns)}):")
+                for i, col in enumerate(df.columns, 1):
+                    logger.error(f"   {i}. '{col}'")
+                logger.error("=" * 80)
+                raise ValueError(f"Archivo OutView inválido. Columnas faltantes: {', '.join(columnas_faltantes)}")
+
+            logger.info(f"✅ Todas las columnas requeridas están presentes")
+            logger.info("=" * 80)
+            logger.info("✅ _leer_excel(): LECTURA COMPLETADA EXITOSAMENTE")
+            logger.info("=" * 80)
+            return df
+
+        except ValueError as ve:
+            logger.error(f"❌ ValueError en _leer_excel(): {str(ve)}")
+            raise
+        except Exception as e:
+            logger.error("=" * 80)
+            logger.error(f"❌ Excepción inesperada en _leer_excel()")
+            logger.error(f"   Tipo: {type(e).__name__}")
+            logger.error(f"   Mensaje: {str(e)}")
+            logger.error(f"   Args: {e.args}")
+            logger.error("=" * 80, exc_info=True)
+            raise ValueError(f"Error leyendo archivo Excel: {str(e)}")
 
     def _procesar_fechas(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Extrae fechas derivadas: AÑO, MES, SEMANA
         """
-        # Convertir Fecha a datetime
-        df['Fecha'] = pd.to_datetime(
-            df['Fecha'],
-            format='%d/%m/%Y',
-            dayfirst=True,
-            errors='coerce'
-        )
+        try:
+            logger.info("🔄 Procesando fechas...")
 
-        fechas_invalidas = df['Fecha'].isna().sum()
-        if fechas_invalidas > 0:
-            logger.warning(f"{fechas_invalidas} fechas inválidas (NaT)")
+            # Convertir Fecha a datetime
+            df['Fecha'] = pd.to_datetime(
+                df['Fecha'],
+                format='%d/%m/%Y',
+                dayfirst=True,
+                errors='coerce'
+            )
 
-        # AÑO
-        df['AÑO'] = df['Fecha'].dt.year
+            fechas_invalidas = df['Fecha'].isna().sum()
+            if fechas_invalidas > 0:
+                logger.warning(f"⚠️ {fechas_invalidas} fechas inválidas (NaT)")
 
-        # SEMANA (ISO)
-        df['SEMANA'] = df['Fecha'].dt.isocalendar().week
+            # AÑO
+            df['AÑO'] = df['Fecha'].dt.year
 
-        # MES (texto español)
-        df['Mes_Codigo'] = df['Fecha'].dt.month
-        df['MES'] = df['Mes_Codigo'].map(self.MESES)
+            # SEMANA (ISO)
+            df['SEMANA'] = df['Fecha'].dt.isocalendar().week
 
-        logger.info("Fechas derivadas agregadas: AÑO, MES, SEMANA")
+            # MES (texto español)
+            df['Mes_Codigo'] = df['Fecha'].dt.month
+            df['MES'] = df['Mes_Codigo'].map(self.MESES)
 
-        return df
+            logger.info("✅ Fechas derivadas agregadas: AÑO, MES, SEMANA")
+            return df
+
+        except Exception as e:
+            logger.error(f"❌ Error procesando fechas: {type(e).__name__}: {str(e)}", exc_info=True)
+            raise ValueError(f"Error procesando fechas: {str(e)}")
 
     def _extraer_mes_nombrebase(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -531,60 +647,68 @@ class OutViewProcessor:
         if self.df is None or len(self.df) == 0:
             raise ValueError("No hay datos procesados para generar Excel")
 
-        logger.info("Generando archivo Excel...")
+        logger.info(f"📊 Generando archivo Excel con {len(self.df)} filas...")
 
-        # Crear workbook
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "OutView"
+        try:
+            # Crear workbook (NO usar write_only aquí porque necesitamos formatear)
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "OutView"
+            logger.info("✅ Workbook creado")
 
-        # 1. Fila 1: VACÍA (para mantener compatibilidad)
-        ws.cell(row=1, column=1, value='')
+            # 1. Fila 1: VACÍA (para mantener compatibilidad)
+            ws.cell(row=1, column=1, value='')
 
-        # 2. Escribir metadatos (filas 2-8)
-        metadatos_df = self._crear_dataframe_metadatos()
+            # 2. Escribir metadatos (filas 2-8)
+            metadatos_df = self._crear_dataframe_metadatos()
 
-        for r_idx, row in enumerate(dataframe_to_rows(metadatos_df, index=False, header=False), start=2):
-            for c_idx, value in enumerate(row, start=1):
-                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+            for r_idx, row in enumerate(dataframe_to_rows(metadatos_df, index=False, header=False), start=2):
+                for c_idx, value in enumerate(row, start=1):
+                    cell = ws.cell(row=r_idx, column=c_idx, value=value)
 
-                # Formato para metadatos
-                if c_idx == 1 and r_idx > 2:  # Columna "Descripción" (excepto header)
-                    cell.font = Font(bold=True)
+                    # Formato para metadatos
+                    if c_idx == 1 and r_idx > 2:  # Columna "Descripción" (excepto header)
+                        cell.font = Font(bold=True)
 
-        # 3. Escribir headers (fila 9)
-        header_row = 9
-        for c_idx, col_name in enumerate(self.df.columns, start=1):
-            cell = ws.cell(row=header_row, column=c_idx, value=col_name)
-            cell.font = Font(bold=True, color='FFFFFF')
-            cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-            cell.alignment = Alignment(horizontal='center')
+            # 3. Escribir headers (fila 9)
+            header_row = 9
+            for c_idx, col_name in enumerate(self.df.columns, start=1):
+                cell = ws.cell(row=header_row, column=c_idx, value=col_name)
+                cell.font = Font(bold=True, color='FFFFFF')
+                cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+                cell.alignment = Alignment(horizontal='center')
 
-        # 4. Escribir datos (fila 10+)
-        for r_idx, row in enumerate(dataframe_to_rows(self.df, index=False, header=False), start=10):
-            for c_idx, value in enumerate(row, start=1):
-                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+            # 4. Escribir datos (fila 10+)
+            for r_idx, row in enumerate(dataframe_to_rows(self.df, index=False, header=False), start=10):
+                for c_idx, value in enumerate(row, start=1):
+                    cell = ws.cell(row=r_idx, column=c_idx, value=value)
 
-                # Formato para fechas
-                if c_idx == 1 and isinstance(value, pd.Timestamp):
-                    cell.number_format = 'DD/MM/YYYY'
-                    cell.alignment = Alignment(horizontal='right')
+                    # Formato para fechas
+                    if c_idx == 1 and isinstance(value, pd.Timestamp):
+                        cell.number_format = 'DD/MM/YYYY'
+                        cell.alignment = Alignment(horizontal='right')
 
-                # Formato para números con decimales
-                elif isinstance(value, (int, float)) and not pd.isna(value):
-                    cell.alignment = Alignment(horizontal='right')
+                    # Formato para números con decimales
+                    elif isinstance(value, (int, float)) and not pd.isna(value):
+                        cell.alignment = Alignment(horizontal='right')
 
-        # 5. Ajustar anchos de columna
-        self._ajustar_columnas(ws)
+            # 5. Ajustar anchos de columna
+            self._ajustar_columnas(ws)
 
-        # 6. Guardar en BytesIO
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
+            # 6. Guardar en BytesIO
+            logger.info("💾 Guardando Excel en memoria...")
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
 
-        logger.info("Excel generado exitosamente")
+            excel_size_kb = len(output.getvalue()) / 1024
+            logger.info(f"✅ Excel generado exitosamente: {excel_size_kb:.2f} KB")
 
-        return output
+            return output
+
+        except Exception as e:
+            logger.error(f"❌ Error generando Excel: {type(e).__name__}: {str(e)}", exc_info=True)
+            raise ValueError(f"Error generando archivo Excel: {str(e)}")
 
     def _crear_dataframe_metadatos(self) -> pd.DataFrame:
         """Crea DataFrame de metadatos para las filas 2-8 del Excel"""

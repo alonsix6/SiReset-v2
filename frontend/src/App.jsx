@@ -4,11 +4,13 @@ import axios from 'axios'
 import { supabase } from './lib/supabaseClient'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
+import CreatePassword from './pages/CreatePassword'
 import Dashboard from './pages/Dashboard'
 import Mougli from './pages/Mougli'
 import Mapito from './pages/Mapito'
 import TheBox from './pages/TheBox'
 import BenchBox from './pages/BenchBox'
+import AfiniMap from './pages/AfiniMap'
 import Admin from './pages/Admin'
 import Layout from './components/Layout'
 
@@ -70,15 +72,18 @@ function App() {
     // Verificar sesión actual de Supabase
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        // Forzar rol admin si el email es admin@reset.com.pe
+        const isMainAdmin = session.user.email === 'admin@reset.com.pe'
+
         const userData = {
           id: session.user.id,
           email: session.user.email,
           name: session.user.user_metadata?.name ||
                 session.user.user_metadata?.full_name ||
                 session.user.email,
-          role: session.user.user_metadata?.role || 'user',
+          role: isMainAdmin ? 'admin' : (session.user.user_metadata?.role || 'user'),
           active: true,
-          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox']
+          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox', 'AfiniMap']
         }
         setUser(userData)
         localStorage.setItem('token', session.access_token)
@@ -92,15 +97,18 @@ function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        // Forzar rol admin si el email es admin@reset.com.pe
+        const isMainAdmin = session.user.email === 'admin@reset.com.pe'
+
         const userData = {
           id: session.user.id,
           email: session.user.email,
           name: session.user.user_metadata?.name ||
                 session.user.user_metadata?.full_name ||
                 session.user.email,
-          role: session.user.user_metadata?.role || 'user',
+          role: isMainAdmin ? 'admin' : (session.user.user_metadata?.role || 'user'),
           active: true,
-          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox']
+          modules: session.user.user_metadata?.modules || ['Mougli', 'Mapito', 'TheBox', 'AfiniMap']
         }
         setUser(userData)
         localStorage.setItem('token', session.access_token)
@@ -146,6 +154,7 @@ function App() {
     return (
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/crear-password" element={<CreatePassword />} />
         <Route path="*" element={<Login onLogin={handleLogin} />} />
       </Routes>
     )
@@ -177,6 +186,9 @@ function App() {
       <Route path="/benchbox" element={
         <Layout user={user} onLogout={handleLogout}>
           <BenchBox user={user} />
+      <Route path="/afinimap" element={
+        <Layout user={user} onLogout={handleLogout}>
+          <AfiniMap user={user} />
         </Layout>
       } />
       <Route path="/admin" element={

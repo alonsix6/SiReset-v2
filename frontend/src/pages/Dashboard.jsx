@@ -37,6 +37,13 @@ export default function Dashboard({ user }) {
       gradient: 'from-purple-500 to-reset-purple',
       borderColor: 'border-reset-purple',
       path: '/benchbox'
+      code: 'AfiniMap',
+      title: 'AFINIMAP',
+      description: 'Mapas de afinidad TGI - Scatter plots de consumo y afinidad',
+      icon: '▶',
+      gradient: 'from-yellow-500 to-orange-500',
+      borderColor: 'border-yellow-500',
+      path: '/afinimap'
     }
   ]
 

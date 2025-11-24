@@ -4,7 +4,11 @@ import { useState, useRef, useEffect } from 'react'
 export default function Layout({ user, onLogout, children }) {
   const location = useLocation()
   const [isAppsDropdownOpen, setIsAppsDropdownOpen] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
   const dropdownRef = useRef(null)
+
+  // Verificar si el usuario es admin principal
+  const isMainAdmin = user?.email === 'admin@reset.com.pe'
 
   // Apps disponibles - TODAS visibles para todos los usuarios
   const apps = [
@@ -12,24 +16,19 @@ export default function Layout({ user, onLogout, children }) {
     { name: 'Mapito', path: '/mapito', icon: '▶' },
     { name: 'The Box', path: '/thebox', icon: '▶' },
     { name: 'BenchBox', path: '/benchbox', icon: '▶' },
+    { name: 'AfiniMap', path: '/afinimap', icon: '▶' },
   ]
 
-  // Navegación principal (Dashboard y Admin)
+  // Navegación principal (Dashboard)
   const mainNavigation = [
     { name: 'Dashboard', path: '/', icon: '▶' },
-    { name: 'Admin', path: '/admin', icon: '▶', adminOnly: true },
   ]
 
   // Todas las apps son visibles para todos los usuarios
   const visibleApps = apps
 
-  // Filtrar navegación principal (solo Admin requiere permisos)
-  const visibleMainNav = mainNavigation.filter(item => {
-    if (item.adminOnly) {
-      return user.role === 'admin'
-    }
-    return true
-  })
+  // La navegación principal siempre muestra Dashboard
+  const visibleMainNav = mainNavigation
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
@@ -50,7 +49,7 @@ export default function Layout({ user, onLogout, children }) {
       {/* Navbar - Reset Style */}
       <nav className="bg-reset-black border-b border-reset-gray-medium">
         <div className="container-reset">
-          <div className="flex justify-between items-center h-20">
+          <div className="flex items-center h-20">
             {/* Logo */}
             <div className="flex items-center">
               <Link to="/" className="flex items-center group">
@@ -61,7 +60,7 @@ export default function Layout({ user, onLogout, children }) {
             </div>
 
             {/* Navigation Links - Desktop */}
-            <div className="hidden md:flex items-center space-x-1">
+            <div className="hidden md:flex items-center space-x-1 ml-12">
               {/* Navegación principal */}
               {visibleMainNav.map((item) => (
                 <Link
@@ -132,10 +131,29 @@ export default function Layout({ user, onLogout, children }) {
                   )}
                 </div>
               )}
+
+              {/* Botón INVITAR (solo para admin@reset.com.pe) */}
+              {isMainAdmin && (
+                <Link
+                  to="/admin"
+                  className={`flex items-center px-4 py-2 rounded-reset-sm font-body font-semibold text-sm uppercase tracking-wide transition-all duration-200 ${
+                    location.pathname === '/admin'
+                      ? 'bg-reset-magenta text-reset-black'
+                      : 'text-reset-magenta border border-reset-magenta hover:bg-reset-magenta hover:text-reset-black'
+                  }`}
+                >
+                  <span className={`mr-2 text-xs ${
+                    location.pathname === '/admin' ? 'text-reset-black' : 'text-reset-magenta'
+                  }`}>
+                    +
+                  </span>
+                  Invitar
+                </Link>
+              )}
             </div>
 
             {/* User Info & Logout */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 ml-auto">
               <div className="hidden lg:block text-right max-w-[200px]">
                 <div className="text-sm font-body font-semibold text-reset-white truncate">
                   {user.name}
