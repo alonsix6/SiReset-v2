@@ -329,7 +329,7 @@ export default function Mapito({ user }) {
       tempDiv.style.height = '2400px'
       tempDiv.style.position = 'absolute'
       tempDiv.style.left = '-9999px'
-      tempDiv.style.top = '0'
+      tempDiv.style.top = '-9999px'  // Mover completamente fuera del viewport
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
       document.body.appendChild(tempDiv)
 
@@ -377,8 +377,11 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      // Ajustar vista - VOLVER A LA LÓGICA SIMPLE QUE FUNCIONABA
-      const bounds = geoJsonLayer.getBounds()
+      // Ajustar vista - Calcular bounds SOLO sobre las áreas seleccionadas
+      // Esto asegura que el zoom y centro estén enfocados en la selección,
+      // incluso cuando se renderiza el contexto completo
+      const selectedGeoJson = L.geoJSON(selectedData)
+      const bounds = selectedGeoJson.getBounds()
       const padding = showBasemap ? [100, 100] : [50, 50]  // Padding moderado
       tempMap.fitBounds(bounds, {
         padding: padding,
@@ -387,9 +390,9 @@ export default function Mapito({ user }) {
 
       // Esperar a que se carguen los tiles si el basemap está activo
       if (showBasemap) {
-        await new Promise(resolve => setTimeout(resolve, 1500))
+        await new Promise(resolve => setTimeout(resolve, 2500))
       } else {
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await new Promise(resolve => setTimeout(resolve, 800))
       }
 
       // Importar html2canvas dinámicamente
@@ -518,7 +521,7 @@ export default function Mapito({ user }) {
       tempDiv.style.height = '2400px'
       tempDiv.style.position = 'absolute'
       tempDiv.style.left = '-9999px'
-      tempDiv.style.top = '0'
+      tempDiv.style.top = '-9999px'  // Mover completamente fuera del viewport
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
       document.body.appendChild(tempDiv)
 
@@ -566,8 +569,11 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      // Ajustar vista
-      const bounds = geoJsonLayer.getBounds()
+      // Ajustar vista - Calcular bounds SOLO sobre las áreas seleccionadas
+      // Esto asegura que el zoom y centro estén enfocados en la selección,
+      // incluso cuando se renderiza el contexto completo
+      const selectedGeoJson = L.geoJSON(selectedData)
+      const bounds = selectedGeoJson.getBounds()
       const padding = showBasemap ? [100, 100] : [50, 50]
       tempMap.fitBounds(bounds, {
         padding: padding,
@@ -576,9 +582,9 @@ export default function Mapito({ user }) {
 
       // Esperar a que se carguen los tiles si el basemap está activo
       if (showBasemap) {
-        await new Promise(resolve => setTimeout(resolve, 1500))
+        await new Promise(resolve => setTimeout(resolve, 2500))
       } else {
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await new Promise(resolve => setTimeout(resolve, 800))
       }
 
       // Importar html2canvas dinámicamente
