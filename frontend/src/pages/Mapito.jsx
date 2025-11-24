@@ -350,7 +350,7 @@ export default function Mapito({ user }) {
       tempMap.invalidateSize()
 
       // Asegurar que el contenedor de Leaflet tenga fondo transparente
-      const leafletContainer = tempDiv.querySelector('.leaflet-container')
+      let leafletContainer = tempDiv.querySelector('.leaflet-container')
       if (leafletContainer && !showBasemap) {
         leafletContainer.style.backgroundColor = 'transparent'
       }
@@ -412,7 +412,7 @@ export default function Mapito({ user }) {
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
 
       // Capturar solo el contenedor de Leaflet, no todo el tempDiv
-      const leafletContainer = tempDiv.querySelector('.leaflet-container')
+      leafletContainer = tempDiv.querySelector('.leaflet-container')
       if (!leafletContainer) {
         throw new Error('No se pudo encontrar el contenedor de Leaflet')
       }
@@ -568,7 +568,7 @@ export default function Mapito({ user }) {
       tempMap.invalidateSize()
 
       // Asegurar que el contenedor de Leaflet tenga fondo transparente
-      const leafletContainer = tempDiv.querySelector('.leaflet-container')
+      let leafletContainer = tempDiv.querySelector('.leaflet-container')
       if (leafletContainer && !showBasemap) {
         leafletContainer.style.backgroundColor = 'transparent'
       }
@@ -630,7 +630,7 @@ export default function Mapito({ user }) {
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
 
       // Capturar solo el contenedor de Leaflet, no todo el tempDiv
-      const leafletContainer = tempDiv.querySelector('.leaflet-container')
+      leafletContainer = tempDiv.querySelector('.leaflet-container')
       if (!leafletContainer) {
         throw new Error('No se pudo encontrar el contenedor de Leaflet')
       }
