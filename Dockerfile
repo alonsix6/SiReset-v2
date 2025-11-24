@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile para Google Cloud Run
 # Stage 1: Construir el frontend React
-FROM node:18-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /frontend
 
