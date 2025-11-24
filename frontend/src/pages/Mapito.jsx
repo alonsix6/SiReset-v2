@@ -309,7 +309,6 @@ export default function Mapito({ user }) {
 
     let tempDiv = null
     let tempMap = null
-    let overlay = null
 
     try {
       // Obtener features seleccionados
@@ -327,29 +326,17 @@ export default function Mapito({ user }) {
         features: selectedFeatures
       }
 
-      // Crear un contenedor temporal VISIBLE para que Leaflet renderice correctamente
+      // Crear un contenedor temporal FUERA DE LA VISTA pero renderizable
+      // Usamos position absolute con coordenadas negativas para que no se vea
+      // pero Leaflet pueda renderizarlo correctamente
       tempDiv = document.createElement('div')
       tempDiv.style.width = '2400px'
       tempDiv.style.height = '2400px'
-      tempDiv.style.position = 'fixed'
-      tempDiv.style.left = '50%'
-      tempDiv.style.top = '50%'
-      tempDiv.style.transform = 'translate(-50%, -50%)'
-      tempDiv.style.zIndex = '9999'
+      tempDiv.style.position = 'absolute'
+      tempDiv.style.left = '-10000px'  // Muy fuera de la vista
+      tempDiv.style.top = '0'
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
-      tempDiv.style.boxShadow = '0 0 20px rgba(0,0,0,0.3)'
 
-      // Crear overlay oscuro detrás
-      overlay = document.createElement('div')
-      overlay.style.position = 'fixed'
-      overlay.style.top = '0'
-      overlay.style.left = '0'
-      overlay.style.width = '100%'
-      overlay.style.height = '100%'
-      overlay.style.backgroundColor = 'rgba(0,0,0,0.7)'
-      overlay.style.zIndex = '9998'
-
-      document.body.appendChild(overlay)
       document.body.appendChild(tempDiv)
 
       // Crear mapa temporal
@@ -424,15 +411,19 @@ export default function Mapito({ user }) {
       // Importar html2canvas dinámicamente
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
 
-      // Capturar el mapa completo
-      const canvas = await html2canvas(tempDiv, {
+      // Capturar solo el contenedor de Leaflet, no todo el tempDiv
+      const leafletContainer = tempDiv.querySelector('.leaflet-container')
+      if (!leafletContainer) {
+        throw new Error('No se pudo encontrar el contenedor de Leaflet')
+      }
+
+      // Capturar el contenedor de Leaflet
+      const canvas = await html2canvas(leafletContainer, {
         useCORS: true,
         allowTaint: true,
         backgroundColor: showBasemap ? '#ffffff' : null,
-        scale: 1,  // Escala 1 porque el div ya es grande
-        logging: false,
-        width: 2400,
-        height: 2400
+        scale: 1,
+        logging: false
       })
 
       // Función para recortar el canvas eliminando áreas transparentes
@@ -503,7 +494,6 @@ export default function Mapito({ user }) {
         // Limpiar
         tempMap.remove()
         document.body.removeChild(tempDiv)
-        document.body.removeChild(overlay)
         setExporting(false)
       }, 'image/png')
 
@@ -517,9 +507,6 @@ export default function Mapito({ user }) {
       }
       if (tempDiv && tempDiv.parentNode) {
         document.body.removeChild(tempDiv)
-      }
-      if (overlay && overlay.parentNode) {
-        document.body.removeChild(overlay)
       }
 
       setExporting(false)
@@ -540,7 +527,6 @@ export default function Mapito({ user }) {
 
     let tempDiv = null
     let tempMap = null
-    let overlay = null
 
     try {
       // Obtener features seleccionados
@@ -558,29 +544,17 @@ export default function Mapito({ user }) {
         features: selectedFeatures
       }
 
-      // Crear un contenedor temporal VISIBLE para que Leaflet renderice correctamente
+      // Crear un contenedor temporal FUERA DE LA VISTA pero renderizable
+      // Usamos position absolute con coordenadas negativas para que no se vea
+      // pero Leaflet pueda renderizarlo correctamente
       tempDiv = document.createElement('div')
       tempDiv.style.width = '2400px'
       tempDiv.style.height = '2400px'
-      tempDiv.style.position = 'fixed'
-      tempDiv.style.left = '50%'
-      tempDiv.style.top = '50%'
-      tempDiv.style.transform = 'translate(-50%, -50%)'
-      tempDiv.style.zIndex = '9999'
+      tempDiv.style.position = 'absolute'
+      tempDiv.style.left = '-10000px'  // Muy fuera de la vista
+      tempDiv.style.top = '0'
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
-      tempDiv.style.boxShadow = '0 0 20px rgba(0,0,0,0.3)'
 
-      // Crear overlay oscuro detrás
-      overlay = document.createElement('div')
-      overlay.style.position = 'fixed'
-      overlay.style.top = '0'
-      overlay.style.left = '0'
-      overlay.style.width = '100%'
-      overlay.style.height = '100%'
-      overlay.style.backgroundColor = 'rgba(0,0,0,0.7)'
-      overlay.style.zIndex = '9998'
-
-      document.body.appendChild(overlay)
       document.body.appendChild(tempDiv)
 
       // Crear mapa temporal
@@ -655,15 +629,19 @@ export default function Mapito({ user }) {
       // Importar html2canvas dinámicamente
       const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
 
-      // Capturar el mapa completo
-      const canvas = await html2canvas(tempDiv, {
+      // Capturar solo el contenedor de Leaflet, no todo el tempDiv
+      const leafletContainer = tempDiv.querySelector('.leaflet-container')
+      if (!leafletContainer) {
+        throw new Error('No se pudo encontrar el contenedor de Leaflet')
+      }
+
+      // Capturar el contenedor de Leaflet
+      const canvas = await html2canvas(leafletContainer, {
         useCORS: true,
         allowTaint: true,
         backgroundColor: showBasemap ? '#ffffff' : null,
         scale: 1,
-        logging: false,
-        width: 2400,
-        height: 2400
+        logging: false
       })
 
       // Función para recortar el canvas eliminando áreas transparentes
@@ -756,9 +734,6 @@ export default function Mapito({ user }) {
       }
       if (tempDiv && tempDiv.parentNode) {
         document.body.removeChild(tempDiv)
-      }
-      if (overlay && overlay.parentNode) {
-        document.body.removeChild(overlay)
       }
 
       setExporting(false)
