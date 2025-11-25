@@ -449,48 +449,22 @@ export default function Mapito({ user }) {
         divId: tempDiv.id,
         divInDOM: document.body.contains(tempDiv),
         divChildren: tempDiv.childNodes.length,
-        divFirstChild: tempDiv.firstChild?.className
+        containerClassName: tempMap.getContainer()?.className
       })
 
-      // Esperar a que Leaflet cree el contenedor interno usando polling
-      let leafletContainer = null
-      let attempts = 0
-      const maxAttempts = 40  // 40 * 50ms = 2 segundos máximo
-
-      while (!leafletContainer && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 50))
-        leafletContainer = tempDiv.querySelector('.leaflet-container')
-        attempts++
-
-        if (attempts === 5) {
-          // Después de 250ms, forzar otra invalidación
-          console.log('🔄 Forzando invalidateSize() en intento 5')
-          tempMap.invalidateSize()
-        }
-
-        if (attempts % 10 === 0) {
-          console.log(`⏳ Intento ${attempts}/40: contenedor=${!!leafletContainer}, children=${tempDiv.childNodes.length}`)
-        }
-      }
+      // El contenedor ES tempDiv mismo (Leaflet le agrega la clase)
+      // No es un hijo de tempDiv, por eso querySelector falla
+      const leafletContainer = tempMap.getContainer()
 
       if (!leafletContainer) {
-        console.error('❌ Debug info completo:', {
-          tempDivExists: !!tempDiv,
-          tempDivId: tempDiv.id,
-          tempDivInDOM: document.body.contains(tempDiv),
-          tempDivChildren: tempDiv.childNodes.length,
-          tempDivHTML: tempDiv.innerHTML.substring(0, 500),
-          tempDivComputedStyle: window.getComputedStyle(tempDiv).display,
-          leafletGlobal: typeof L !== 'undefined',
-          leafletVersion: L.version,
-          mapObject: !!tempMap,
-          mapContainer: tempMap?.getContainer()?.className,
-          mapSize: tempMap?.getSize()
+        console.error('❌ getContainer() devolvió null:', {
+          tempMap: !!tempMap,
+          tempDiv: !!tempDiv
         })
-        throw new Error(`Leaflet no creó el contenedor después de ${attempts} intentos (${attempts * 50}ms). Ver console para debug info completo.`)
+        throw new Error('Leaflet.getContainer() devolvió null inesperadamente')
       }
 
-      console.log(`✅ Contenedor de Leaflet creado después de ${attempts * 50}ms`)
+      console.log('✅ Contenedor obtenido exitosamente:', leafletContainer.className)
 
       // Ahora que el contenedor existe, esconder el div
       tempDiv.style.opacity = '0'
@@ -630,11 +604,18 @@ export default function Mapito({ user }) {
       setExportProgress(90)
       setExportStatus('Capturando imagen...')
 
-      // Obtener el contenedor de Leaflet para capturar (ya verificado que existe)
-      const containerToCapture = tempDiv.querySelector('.leaflet-container')
+      // Obtener el contenedor de Leaflet para capturar
+      // Usamos getContainer() porque el div ES el contenedor
+      const containerToCapture = tempMap.getContainer()
       if (!containerToCapture) {
         throw new Error('El contenedor de Leaflet desapareció inesperadamente')
       }
+
+      console.log('📸 Capturando contenedor:', {
+        className: containerToCapture.className,
+        width: containerToCapture.offsetWidth,
+        height: containerToCapture.offsetHeight
+      })
 
       // Usar html-to-image en vez de html2canvas desde CDN
       const dataUrl = await toPng(containerToCapture, {
