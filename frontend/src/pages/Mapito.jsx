@@ -441,14 +441,35 @@ export default function Mapito({ user }) {
       // Forzar a Leaflet a recalcular el tamaño del contenedor
       tempMap.invalidateSize()
 
-      // Dar tiempo a Leaflet para crear el contenedor interno
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Esperar a que Leaflet cree el contenedor interno usando polling
+      let leafletContainer = null
+      let attempts = 0
+      const maxAttempts = 40  // 40 * 50ms = 2 segundos máximo
 
-      // Verificar que el contenedor se creó
-      const leafletContainer = tempDiv.querySelector('.leaflet-container')
-      if (!leafletContainer) {
-        throw new Error('Leaflet no creó el contenedor interno. Verifica que Leaflet esté cargado correctamente.')
+      while (!leafletContainer && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        leafletContainer = tempDiv.querySelector('.leaflet-container')
+        attempts++
+
+        if (attempts === 5) {
+          // Después de 250ms, forzar otra invalidación
+          tempMap.invalidateSize()
+        }
       }
+
+      if (!leafletContainer) {
+        console.error('Debug info:', {
+          tempDivExists: !!tempDiv,
+          tempDivInDOM: document.body.contains(tempDiv),
+          tempDivChildren: tempDiv.childNodes.length,
+          tempDivHTML: tempDiv.innerHTML.substring(0, 300),
+          leafletGlobal: typeof L !== 'undefined',
+          mapObject: !!tempMap
+        })
+        throw new Error(`Leaflet no creó el contenedor después de ${attempts} intentos. Por favor recarga la página.`)
+      }
+
+      console.log(`✅ Contenedor de Leaflet creado después de ${attempts * 50}ms`)
 
       // Ahora que el contenedor existe, esconder el div
       tempDiv.style.opacity = '0'
