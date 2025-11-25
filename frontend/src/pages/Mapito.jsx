@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { toPng } from 'html-to-image'
 
 // Componente para ajustar el zoom del mapa
 function FitBounds({ bounds }) {
@@ -14,6 +15,59 @@ function FitBounds({ bounds }) {
   }, [bounds, map])
 
   return null
+}
+
+// Función utilitaria para recortar canvas (fuera del componente para reutilización)
+const cropCanvas = (sourceCanvas) => {
+  const ctx = sourceCanvas.getContext('2d', { willReadFrequently: true })
+  const imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
+  const pixels = imageData.data
+
+  let minX = sourceCanvas.width
+  let minY = sourceCanvas.height
+  let maxX = 0
+  let maxY = 0
+
+  // Encontrar los límites del contenido no transparente
+  for (let y = 0; y < sourceCanvas.height; y++) {
+    for (let x = 0; x < sourceCanvas.width; x++) {
+      const index = (y * sourceCanvas.width + x) * 4
+      const alpha = pixels[index + 3]
+
+      // Detectar píxeles no transparentes
+      if (alpha > 10) {
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+    }
+  }
+
+  // Agregar margen de seguridad
+  const margin = 20
+  minX = Math.max(0, minX - margin)
+  minY = Math.max(0, minY - margin)
+  maxX = Math.min(sourceCanvas.width - 1, maxX + margin)
+  maxY = Math.min(sourceCanvas.height - 1, maxY + margin)
+
+  const croppedWidth = maxX - minX + 1
+  const croppedHeight = maxY - minY + 1
+
+  // Crear nuevo canvas con el tamaño recortado
+  const croppedCanvas = document.createElement('canvas')
+  croppedCanvas.width = croppedWidth
+  croppedCanvas.height = croppedHeight
+  const croppedCtx = croppedCanvas.getContext('2d')
+
+  // Copiar la región recortada
+  croppedCtx.drawImage(
+    sourceCanvas,
+    minX, minY, croppedWidth, croppedHeight,
+    0, 0, croppedWidth, croppedHeight
+  )
+
+  return croppedCanvas
 }
 
 export default function Mapito({ user }) {
@@ -29,6 +83,8 @@ export default function Mapito({ user }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
+  const [exportStatus, setExportStatus] = useState('')
 
   // Estado de colores y estilos
   const [colorGeneral, setColorGeneral] = useState('#713030')
@@ -43,6 +99,7 @@ export default function Mapito({ user }) {
 
   // Refs
   const mapRef = useRef(null)
+  const copyFeedbackTimeoutRef = useRef(null)
 
   // Bounds para fitBounds
   const [mapBounds, setMapBounds] = useState(null)
@@ -119,6 +176,15 @@ export default function Mapito({ user }) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showExportMenu])
+
+  // Cleanup de timeout de feedback al desmontar
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimeoutRef.current) {
+        clearTimeout(copyFeedbackTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const loadGeoData = async () => {
     setLoading(true)
@@ -301,286 +367,160 @@ export default function Mapito({ user }) {
     })
   }
 
-  // Exportar a PNG - Solo las áreas seleccionadas, sin el resto del mapa
-  const exportToPng = async () => {
-    if (!mapRef.current || !geoData) return
+  /**
+   * Función compartida para generar imagen del mapa
+   * Elimina duplicación de código entre exportToPng y copyToClipboard
+   * Implementa detección real de carga de tiles y reporta progreso
+   */
+  const generateMapImage = async () => {
+    // Validación inicial
+    if (!geoData) {
+      throw new Error('No hay datos del mapa cargados')
+    }
 
-    setExporting(true)
+    const selectedFeatures = geoData.features.filter(f => isSelected(f))
+    if (selectedFeatures.length === 0) {
+      throw new Error('Por favor selecciona al menos un área para exportar')
+    }
+
+    // Crear datos solo con features seleccionados
+    const selectedData = {
+      type: 'FeatureCollection',
+      features: selectedFeatures
+    }
 
     let tempDiv = null
     let tempMap = null
+    let tileLayer = null
+    let cleanupFunctions = []
 
     try {
-      // Obtener features seleccionados
-      const selectedFeatures = geoData.features.filter(f => isSelected(f))
+      // Paso 1: Crear contenedor (5%)
+      setExportProgress(5)
+      setExportStatus('Preparando canvas...')
 
-      if (selectedFeatures.length === 0) {
-        alert('Por favor selecciona al menos un área para exportar')
-        setExporting(false)
-        return
-      }
-
-      // Crear datos solo con features seleccionados
-      const selectedData = {
-        type: 'FeatureCollection',
-        features: selectedFeatures
-      }
-
-      // Crear un contenedor temporal FUERA DE LA VISTA pero renderizable
-      // Usamos position absolute con coordenadas negativas para que no se vea
-      // pero Leaflet pueda renderizarlo correctamente
+      // Crear un contenedor temporal COMPLETAMENTE FUERA DEL VIEWPORT
+      // FIX CRÍTICO: top debe ser -9999px, no 0
       tempDiv = document.createElement('div')
       tempDiv.style.width = '2400px'
       tempDiv.style.height = '2400px'
       tempDiv.style.position = 'absolute'
-      tempDiv.style.left = '-10000px'  // Muy fuera de la vista
-      tempDiv.style.top = '0'
+      tempDiv.style.left = '-9999px'
+      tempDiv.style.top = '-9999px'  // ✅ FIX: Completamente fuera del viewport
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
+      tempDiv.style.zIndex = '-9999'
 
       document.body.appendChild(tempDiv)
+      cleanupFunctions.push(() => {
+        if (tempDiv && tempDiv.parentNode) {
+          document.body.removeChild(tempDiv)
+        }
+      })
 
-      // Crear mapa temporal
+      // Paso 2: Crear mapa (10%)
+      setExportProgress(10)
+      setExportStatus('Inicializando mapa...')
+
       tempMap = L.map(tempDiv, {
         zoomControl: false,
         attributionControl: false,
         preferCanvas: false
       }).setView([-9.2, -75.0], 5)
 
-      // IMPORTANTE: Forzar a Leaflet a recalcular el tamaño del contenedor
+      cleanupFunctions.push(() => {
+        if (tempMap) {
+          try {
+            tempMap.off()
+            tempMap.remove()
+          } catch (e) {
+            console.error('Error limpiando mapa:', e)
+          }
+        }
+      })
+
+      // Forzar a Leaflet a recalcular el tamaño del contenedor
       tempMap.invalidateSize()
 
       // Asegurar que el contenedor de Leaflet tenga fondo transparente
-      let leafletContainer = tempDiv.querySelector('.leaflet-container')
+      const leafletContainer = tempDiv.querySelector('.leaflet-container')
       if (leafletContainer && !showBasemap) {
         leafletContainer.style.backgroundColor = 'transparent'
       }
 
-      // Si showBasemap está activo, agregar el mapa base
+      // Paso 3: Agregar TileLayer con detección de carga (15-50%)
       if (showBasemap) {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19
-        }).addTo(tempMap)
-      }
+        setExportStatus('Cargando mapa base...')
 
-      // Agregar GeoJSON según el contexto
-      const dataToRender = includeContext ? geoData : selectedData
+        // FIX CRÍTICO: Agregar crossOrigin para evitar problemas CORS
+        tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          crossOrigin: 'anonymous'  // ✅ FIX: Permitir captura con html2canvas
+        })
 
-      const geoJsonLayer = L.geoJSON(dataToRender, {
-        style: (feature) => {
-          if (includeContext) {
-            const selected = isSelected(feature)
-            return {
-              fillColor: selected ? colorSelected : colorGeneral,
-              fillOpacity: selected ? 0.95 : 0.85,
-              color: showBorders ? colorBorder : (selected ? colorSelected : colorGeneral),
-              weight: showBorders ? grosorBorde : 0
-            }
-          } else {
-            return {
-              fillColor: colorSelected,
-              fillOpacity: 0.95,
-              color: showBorders ? colorBorder : colorSelected,
-              weight: showBorders ? grosorBorde : 0
+        // Detectar carga real de tiles con evento 'load'
+        await new Promise((resolve, reject) => {
+          let tilesLoaded = 0
+          let tilesToLoad = 0
+          let isResolved = false
+
+          const checkComplete = () => {
+            if (isResolved) return
+
+            const progress = tilesToLoad > 0
+              ? 15 + Math.floor((tilesLoaded / tilesToLoad) * 35)
+              : 50
+            setExportProgress(Math.min(progress, 50))
+
+            if (tilesLoaded >= tilesToLoad && tilesToLoad > 0) {
+              isResolved = true
+              setExportProgress(50)
+              resolve()
             }
           }
-        }
-      }).addTo(tempMap)
 
-      // Ajustar vista - VOLVER A LA LÓGICA SIMPLE QUE FUNCIONABA
-      const bounds = geoJsonLayer.getBounds()
-      const padding = showBasemap ? [100, 100] : [50, 50]  // Padding moderado
-      tempMap.fitBounds(bounds, {
-        padding: padding,
-        maxZoom: 18
-      })
+          tileLayer.on('tileloadstart', () => {
+            tilesToLoad++
+          })
 
-      // Forzar actualización del mapa después de agregar las capas
-      tempMap.invalidateSize()
+          tileLayer.on('tileload', () => {
+            tilesLoaded++
+            checkComplete()
+          })
 
-      // Esperar a que se carguen los tiles si el basemap está activo
-      // Aumentamos el tiempo de espera para asegurar que todo se renderice correctamente
-      if (showBasemap) {
-        await new Promise(resolve => setTimeout(resolve, 2500))
+          tileLayer.on('tileerror', () => {
+            tilesLoaded++
+            checkComplete()
+          })
+
+          tileLayer.addTo(tempMap)
+
+          // Timeout de seguridad mejorado
+          setTimeout(() => {
+            if (!isResolved) {
+              isResolved = true
+              console.warn('Timeout esperando tiles, continuando...')
+              setExportProgress(50)
+              resolve()
+            }
+          }, 5000)
+
+          // Si no hay tiles para cargar, resolver inmediatamente
+          setTimeout(() => {
+            if (tilesToLoad === 0) {
+              isResolved = true
+              setExportProgress(50)
+              resolve()
+            }
+          }, 100)
+        })
       } else {
-        await new Promise(resolve => setTimeout(resolve, 800))
+        setExportProgress(50)
       }
 
-      // Una última invalidación antes de capturar
-      tempMap.invalidateSize()
+      // Paso 4: Agregar GeoJSON (60%)
+      setExportProgress(60)
+      setExportStatus('Renderizando áreas...')
 
-      // Importar html2canvas dinámicamente
-      const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
-
-      // Capturar solo el contenedor de Leaflet, no todo el tempDiv
-      leafletContainer = tempDiv.querySelector('.leaflet-container')
-      if (!leafletContainer) {
-        throw new Error('No se pudo encontrar el contenedor de Leaflet')
-      }
-
-      // Capturar el contenedor de Leaflet
-      const canvas = await html2canvas(leafletContainer, {
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: showBasemap ? '#ffffff' : null,
-        scale: 1,
-        logging: false
-      })
-
-      // Función para recortar el canvas eliminando áreas transparentes
-      const cropCanvas = (sourceCanvas) => {
-        const ctx = sourceCanvas.getContext('2d')
-        const imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
-        const pixels = imageData.data
-
-        let minX = sourceCanvas.width
-        let minY = sourceCanvas.height
-        let maxX = 0
-        let maxY = 0
-
-        // Encontrar los límites del contenido no transparente
-        for (let y = 0; y < sourceCanvas.height; y++) {
-          for (let x = 0; x < sourceCanvas.width; x++) {
-            const index = (y * sourceCanvas.width + x) * 4
-            const alpha = pixels[index + 3]
-
-            // Detectar píxeles no transparentes
-            if (alpha > 10) {
-              if (x < minX) minX = x
-              if (x > maxX) maxX = x
-              if (y < minY) minY = y
-              if (y > maxY) maxY = y
-            }
-          }
-        }
-
-        // Agregar margen de seguridad
-        const margin = 20
-        minX = Math.max(0, minX - margin)
-        minY = Math.max(0, minY - margin)
-        maxX = Math.min(sourceCanvas.width - 1, maxX + margin)
-        maxY = Math.min(sourceCanvas.height - 1, maxY + margin)
-
-        const croppedWidth = maxX - minX + 1
-        const croppedHeight = maxY - minY + 1
-
-        // Crear nuevo canvas con el tamaño recortado
-        const croppedCanvas = document.createElement('canvas')
-        croppedCanvas.width = croppedWidth
-        croppedCanvas.height = croppedHeight
-        const croppedCtx = croppedCanvas.getContext('2d')
-
-        // Copiar la región recortada
-        croppedCtx.drawImage(
-          sourceCanvas,
-          minX, minY, croppedWidth, croppedHeight,
-          0, 0, croppedWidth, croppedHeight
-        )
-
-        return croppedCanvas
-      }
-
-      // Recortar solo si no hay basemap (para optimizar tamaño)
-      const finalCanvas = showBasemap ? canvas : cropCanvas(canvas)
-
-      // Convertir a PNG y descargar
-      finalCanvas.toBlob((blob) => {
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.download = `mapa-peru-${nivel}-${Date.now()}.png`
-        link.href = url
-        link.click()
-        URL.revokeObjectURL(url)
-
-        // Limpiar
-        tempMap.remove()
-        document.body.removeChild(tempDiv)
-        setExporting(false)
-      }, 'image/png')
-
-    } catch (err) {
-      console.error('Error exportando mapa:', err)
-      alert('Error al exportar el mapa. Por favor, intenta nuevamente.')
-
-      // Limpiar elementos si fueron creados
-      if (tempMap) {
-        try { tempMap.remove() } catch (e) {}
-      }
-      if (tempDiv && tempDiv.parentNode) {
-        document.body.removeChild(tempDiv)
-      }
-
-      setExporting(false)
-    }
-  }
-
-  // Copiar mapa al portapapeles
-  const copyToClipboard = async () => {
-    if (!mapRef.current || !geoData) return
-
-    // Verificar si el navegador soporta la Clipboard API
-    if (!navigator.clipboard || !ClipboardItem) {
-      alert('Tu navegador no soporta copiar imágenes al portapapeles. Por favor, usa la opción de descargar.')
-      return
-    }
-
-    setExporting(true)
-
-    let tempDiv = null
-    let tempMap = null
-
-    try {
-      // Obtener features seleccionados
-      const selectedFeatures = geoData.features.filter(f => isSelected(f))
-
-      if (selectedFeatures.length === 0) {
-        alert('Por favor selecciona al menos un área para copiar')
-        setExporting(false)
-        return
-      }
-
-      // Crear datos solo con features seleccionados
-      const selectedData = {
-        type: 'FeatureCollection',
-        features: selectedFeatures
-      }
-
-      // Crear un contenedor temporal FUERA DE LA VISTA pero renderizable
-      // Usamos position absolute con coordenadas negativas para que no se vea
-      // pero Leaflet pueda renderizarlo correctamente
-      tempDiv = document.createElement('div')
-      tempDiv.style.width = '2400px'
-      tempDiv.style.height = '2400px'
-      tempDiv.style.position = 'absolute'
-      tempDiv.style.left = '-10000px'  // Muy fuera de la vista
-      tempDiv.style.top = '0'
-      tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
-
-      document.body.appendChild(tempDiv)
-
-      // Crear mapa temporal
-      tempMap = L.map(tempDiv, {
-        zoomControl: false,
-        attributionControl: false,
-        preferCanvas: false
-      }).setView([-9.2, -75.0], 5)
-
-      // IMPORTANTE: Forzar a Leaflet a recalcular el tamaño del contenedor
-      tempMap.invalidateSize()
-
-      // Asegurar que el contenedor de Leaflet tenga fondo transparente
-      let leafletContainer = tempDiv.querySelector('.leaflet-container')
-      if (leafletContainer && !showBasemap) {
-        leafletContainer.style.backgroundColor = 'transparent'
-      }
-
-      // Si showBasemap está activo, agregar el mapa base
-      if (showBasemap) {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19
-        }).addTo(tempMap)
-      }
-
-      // Agregar GeoJSON según el contexto
       const dataToRender = includeContext ? geoData : selectedData
 
       const geoJsonLayer = L.geoJSON(dataToRender, {
@@ -604,8 +544,15 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      // Ajustar vista
-      const bounds = geoJsonLayer.getBounds()
+      // Paso 5: Ajustar bounds (70%)
+      setExportProgress(70)
+      setExportStatus('Ajustando vista...')
+
+      // FIX CRÍTICO: Calcular bounds SOLO sobre las áreas seleccionadas
+      // Esto asegura que el zoom se centre en la selección, no en todo el contexto
+      const selectedGeoJson = L.geoJSON(selectedData)
+      const bounds = selectedGeoJson.getBounds()  // ✅ FIX: Bounds sobre selección
+
       const padding = showBasemap ? [100, 100] : [50, 50]
       tempMap.fitBounds(bounds, {
         padding: padding,
@@ -615,92 +562,154 @@ export default function Mapito({ user }) {
       // Forzar actualización del mapa después de agregar las capas
       tempMap.invalidateSize()
 
-      // Esperar a que se carguen los tiles si el basemap está activo
-      // Aumentamos el tiempo de espera para asegurar que todo se renderice correctamente
-      if (showBasemap) {
-        await new Promise(resolve => setTimeout(resolve, 2500))
-      } else {
-        await new Promise(resolve => setTimeout(resolve, 800))
-      }
+      // Paso 6: Esperar estabilización (80%)
+      setExportProgress(80)
+      setExportStatus('Esperando renderizado...')
+
+      // Dar tiempo adicional para que Leaflet termine de renderizar
+      await new Promise(resolve => setTimeout(resolve, 300))
 
       // Una última invalidación antes de capturar
       tempMap.invalidateSize()
 
-      // Importar html2canvas dinámicamente
-      const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default
+      // Paso 7: Capturar imagen (90%)
+      setExportProgress(90)
+      setExportStatus('Capturando imagen...')
 
-      // Capturar solo el contenedor de Leaflet, no todo el tempDiv
-      leafletContainer = tempDiv.querySelector('.leaflet-container')
-      if (!leafletContainer) {
+      // Obtener el contenedor de Leaflet para capturar
+      const containerToCapture = tempDiv.querySelector('.leaflet-container')
+      if (!containerToCapture) {
         throw new Error('No se pudo encontrar el contenedor de Leaflet')
       }
 
-      // Capturar el contenedor de Leaflet
-      const canvas = await html2canvas(leafletContainer, {
-        useCORS: true,
-        allowTaint: true,
+      // Usar html-to-image en vez de html2canvas desde CDN
+      const dataUrl = await toPng(containerToCapture, {
+        quality: 1.0,
+        pixelRatio: 1,
         backgroundColor: showBasemap ? '#ffffff' : null,
-        scale: 1,
-        logging: false
+        cacheBust: true
       })
 
-      // Función para recortar el canvas eliminando áreas transparentes
-      const cropCanvas = (sourceCanvas) => {
-        const ctx = sourceCanvas.getContext('2d')
-        const imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
-        const pixels = imageData.data
+      // Convertir data URL a canvas
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = () => reject(new Error('Error cargando imagen generada'))
+        img.src = dataUrl
+      })
 
-        let minX = sourceCanvas.width
-        let minY = sourceCanvas.height
-        let maxX = 0
-        let maxY = 0
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0)
 
-        // Encontrar los límites del contenido no transparente
-        for (let y = 0; y < sourceCanvas.height; y++) {
-          for (let x = 0; x < sourceCanvas.width; x++) {
-            const index = (y * sourceCanvas.width + x) * 4
-            const alpha = pixels[index + 3]
+      // Paso 8: Recortar si es necesario (95%)
+      setExportProgress(95)
+      setExportStatus('Optimizando imagen...')
 
-            if (alpha > 10) {
-              if (x < minX) minX = x
-              if (x > maxX) maxX = x
-              if (y < minY) minY = y
-              if (y > maxY) maxY = y
-            }
-          }
-        }
-
-        // Agregar margen de seguridad
-        const margin = 20
-        minX = Math.max(0, minX - margin)
-        minY = Math.max(0, minY - margin)
-        maxX = Math.min(sourceCanvas.width - 1, maxX + margin)
-        maxY = Math.min(sourceCanvas.height - 1, maxY + margin)
-
-        const croppedWidth = maxX - minX + 1
-        const croppedHeight = maxY - minY + 1
-
-        // Crear nuevo canvas con el tamaño recortado
-        const croppedCanvas = document.createElement('canvas')
-        croppedCanvas.width = croppedWidth
-        croppedCanvas.height = croppedHeight
-        const croppedCtx = croppedCanvas.getContext('2d')
-
-        // Copiar la región recortada
-        croppedCtx.drawImage(
-          sourceCanvas,
-          minX, minY, croppedWidth, croppedHeight,
-          0, 0, croppedWidth, croppedHeight
-        )
-
-        return croppedCanvas
-      }
-
-      // Recortar solo si no hay basemap (para optimizar tamaño)
       const finalCanvas = showBasemap ? canvas : cropCanvas(canvas)
 
+      // Cleanup antes de retornar
+      cleanupFunctions.forEach(fn => {
+        try {
+          fn()
+        } catch (e) {
+          console.error('Error en cleanup:', e)
+        }
+      })
+
+      setExportProgress(100)
+      setExportStatus('¡Completado!')
+
+      return finalCanvas
+
+    } catch (error) {
+      // Ejecutar cleanup en caso de error
+      cleanupFunctions.forEach(fn => {
+        try {
+          fn()
+        } catch (e) {
+          console.error('Error en cleanup:', e)
+        }
+      })
+      throw error
+    }
+  }
+
+  // Exportar a PNG - Usa generateMapImage()
+  const exportToPng = async () => {
+    if (exporting) return  // Prevenir múltiples exportaciones simultáneas
+
+    setExporting(true)
+    setExportProgress(0)
+    setExportStatus('Iniciando exportación...')
+
+    try {
+      const canvas = await generateMapImage()
+
+      // Convertir a PNG y descargar
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          throw new Error('Error generando blob de imagen')
+        }
+
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.download = `mapa-peru-${nivel}-${Date.now()}.png`
+        link.href = url
+        link.click()
+        URL.revokeObjectURL(url)
+
+        setExporting(false)
+        setExportProgress(0)
+        setExportStatus('')
+      }, 'image/png')
+
+    } catch (err) {
+      console.error('Error exportando mapa:', err)
+
+      let errorMessage = 'Error al exportar el mapa. '
+      if (err.message.includes('selecciona')) {
+        errorMessage = err.message
+      } else if (err.message.includes('Leaflet')) {
+        errorMessage += 'Problema renderizando el mapa.'
+      } else if (err.message.includes('imagen')) {
+        errorMessage += 'Problema capturando la imagen.'
+      } else {
+        errorMessage += 'Por favor, intenta nuevamente.'
+      }
+
+      alert(errorMessage)
+      setExporting(false)
+      setExportProgress(0)
+      setExportStatus('')
+    }
+  }
+
+  // Copiar mapa al portapapeles - Usa generateMapImage()
+  const copyToClipboard = async () => {
+    // Verificar soporte del navegador
+    if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+      alert('Tu navegador no soporta copiar imágenes al portapapeles. Por favor, usa la opción de descargar.')
+      return
+    }
+
+    if (exporting) return  // Prevenir múltiples exportaciones simultáneas
+
+    setExporting(true)
+    setExportProgress(0)
+    setExportStatus('Iniciando copia...')
+
+    try {
+      const canvas = await generateMapImage()
+
       // Convertir a blob y copiar al portapapeles
-      finalCanvas.toBlob(async (blob) => {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          throw new Error('Error generando blob de imagen')
+        }
+
         try {
           await navigator.clipboard.write([
             new ClipboardItem({ 'image/png': blob })
@@ -708,35 +717,51 @@ export default function Mapito({ user }) {
 
           // Mostrar feedback de éxito
           setShowCopyFeedback(true)
-          setTimeout(() => setShowCopyFeedback(false), 3000)
+
+          // Limpiar timeout anterior si existe
+          if (copyFeedbackTimeoutRef.current) {
+            clearTimeout(copyFeedbackTimeoutRef.current)
+          }
+
+          // Programar nuevo timeout
+          copyFeedbackTimeoutRef.current = setTimeout(() => {
+            setShowCopyFeedback(false)
+            copyFeedbackTimeoutRef.current = null
+          }, 3000)
 
           // Cerrar el menú dropdown
           setShowExportMenu(false)
 
         } catch (clipboardErr) {
           console.error('Error copiando al portapapeles:', clipboardErr)
-          alert('No se pudo copiar al portapapeles. Por favor, intenta descargar el mapa.')
+          throw new Error('No se pudo copiar al portapapeles. Por favor, intenta descargar el mapa.')
         } finally {
-          // Limpiar
-          tempMap.remove()
-          document.body.removeChild(tempDiv)
           setExporting(false)
+          setExportProgress(0)
+          setExportStatus('')
         }
       }, 'image/png')
 
     } catch (err) {
       console.error('Error copiando mapa:', err)
-      alert('Error al copiar el mapa. Por favor, intenta nuevamente.')
 
-      // Limpiar elementos si fueron creados
-      if (tempMap) {
-        try { tempMap.remove() } catch (e) {}
-      }
-      if (tempDiv && tempDiv.parentNode) {
-        document.body.removeChild(tempDiv)
+      let errorMessage = 'Error al copiar el mapa. '
+      if (err.message.includes('selecciona')) {
+        errorMessage = err.message
+      } else if (err.message.includes('portapapeles')) {
+        errorMessage = err.message
+      } else if (err.message.includes('Leaflet')) {
+        errorMessage += 'Problema renderizando el mapa.'
+      } else if (err.message.includes('imagen')) {
+        errorMessage += 'Problema capturando la imagen.'
+      } else {
+        errorMessage += 'Por favor, intenta nuevamente.'
       }
 
+      alert(errorMessage)
       setExporting(false)
+      setExportProgress(0)
+      setExportStatus('')
     }
   }
 
@@ -1139,6 +1164,21 @@ export default function Mapito({ user }) {
                 {!exporting && <span className="text-sm">▼</span>}
               </button>
 
+              {/* Progress bar durante exportación */}
+              {exporting && exportProgress > 0 && (
+                <div className="mt-2">
+                  <div className="w-full bg-reset-gray-dark rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-reset-neon to-green-400 h-full transition-all duration-300"
+                      style={{ width: `${exportProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-reset-cyan text-xs mt-1 text-center">
+                    {exportStatus} {exportProgress}%
+                  </p>
+                </div>
+              )}
+
               {/* Dropdown menu */}
               {showExportMenu && !exporting && (
                 <div className="absolute left-0 right-0 mt-2 bg-reset-gray-dark border border-reset-gray-medium rounded-reset shadow-lg z-10 overflow-hidden">
@@ -1209,7 +1249,6 @@ export default function Mapito({ user }) {
 
                 {!loading && !error && geoData && (nivel !== 'distritos' || selectedProvinces.length > 0) && (
                   <MapContainer
-                    ref={mapRef}
                     center={[-9.2, -75.0]}
                     zoom={5}
                     style={{ height: '100%', width: '100%', background: '#1a1a1a' }}
@@ -1243,7 +1282,7 @@ export default function Mapito({ user }) {
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <div className="bg-gradient-to-r from-reset-neon to-green-400 text-reset-black px-5 py-3 rounded-reset shadow-2xl flex items-center space-x-2 border-2 border-reset-neon">
             <span className="text-xl">✅</span>
-            <div className="font-bold text-base">¡Mapito listo!</div>
+            <div className="font-bold text-base">¡Mapa copiado al portapapeles!</div>
           </div>
         </div>
       )}
