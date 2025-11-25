@@ -401,6 +401,7 @@ export default function Mapito({ user }) {
 
       // Crear un contenedor temporal VISIBLE primero (Leaflet necesita visibilidad para crear el contenedor)
       tempDiv = document.createElement('div')
+      tempDiv.id = `mapito-export-${Date.now()}`  // ID único
       tempDiv.style.width = '2400px'
       tempDiv.style.height = '2400px'
       tempDiv.style.position = 'fixed'
@@ -409,6 +410,7 @@ export default function Mapito({ user }) {
       tempDiv.style.zIndex = '99999'  // Temporalmente al frente
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
       tempDiv.style.pointerEvents = 'none'  // No interfiere con UI
+      tempDiv.style.overflow = 'hidden'  // Evitar scroll
 
       document.body.appendChild(tempDiv)
       cleanupFunctions.push(() => {
@@ -421,7 +423,8 @@ export default function Mapito({ user }) {
       setExportProgress(10)
       setExportStatus('Inicializando mapa...')
 
-      tempMap = L.map(tempDiv, {
+      // Crear mapa usando el ID en lugar de la referencia directa
+      tempMap = L.map(tempDiv.id, {
         zoomControl: false,
         attributionControl: false,
         preferCanvas: false
@@ -441,6 +444,14 @@ export default function Mapito({ user }) {
       // Forzar a Leaflet a recalcular el tamaño del contenedor
       tempMap.invalidateSize()
 
+      console.log('🔍 Estado inicial después de crear mapa:', {
+        mapCreated: !!tempMap,
+        divId: tempDiv.id,
+        divInDOM: document.body.contains(tempDiv),
+        divChildren: tempDiv.childNodes.length,
+        divFirstChild: tempDiv.firstChild?.className
+      })
+
       // Esperar a que Leaflet cree el contenedor interno usando polling
       let leafletContainer = null
       let attempts = 0
@@ -453,20 +464,30 @@ export default function Mapito({ user }) {
 
         if (attempts === 5) {
           // Después de 250ms, forzar otra invalidación
+          console.log('🔄 Forzando invalidateSize() en intento 5')
           tempMap.invalidateSize()
+        }
+
+        if (attempts % 10 === 0) {
+          console.log(`⏳ Intento ${attempts}/40: contenedor=${!!leafletContainer}, children=${tempDiv.childNodes.length}`)
         }
       }
 
       if (!leafletContainer) {
-        console.error('Debug info:', {
+        console.error('❌ Debug info completo:', {
           tempDivExists: !!tempDiv,
+          tempDivId: tempDiv.id,
           tempDivInDOM: document.body.contains(tempDiv),
           tempDivChildren: tempDiv.childNodes.length,
-          tempDivHTML: tempDiv.innerHTML.substring(0, 300),
+          tempDivHTML: tempDiv.innerHTML.substring(0, 500),
+          tempDivComputedStyle: window.getComputedStyle(tempDiv).display,
           leafletGlobal: typeof L !== 'undefined',
-          mapObject: !!tempMap
+          leafletVersion: L.version,
+          mapObject: !!tempMap,
+          mapContainer: tempMap?.getContainer()?.className,
+          mapSize: tempMap?.getSize()
         })
-        throw new Error(`Leaflet no creó el contenedor después de ${attempts} intentos. Por favor recarga la página.`)
+        throw new Error(`Leaflet no creó el contenedor después de ${attempts} intentos (${attempts * 50}ms). Ver console para debug info completo.`)
       }
 
       console.log(`✅ Contenedor de Leaflet creado después de ${attempts * 50}ms`)
