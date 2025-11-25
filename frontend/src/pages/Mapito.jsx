@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { toPng } from 'html-to-image'
+import { toCanvas } from 'html-to-image'
 
 // Componente para ajustar el zoom del mapa
 function FitBounds({ bounds }) {
@@ -617,27 +617,26 @@ export default function Mapito({ user }) {
         height: containerToCapture.offsetHeight
       })
 
-      // Usar html-to-image en vez de html2canvas desde CDN
-      const dataUrl = await toPng(containerToCapture, {
+      // Usar toCanvas de html-to-image (más directo, evita problemas de CORS)
+      const canvas = await toCanvas(containerToCapture, {
         quality: 1.0,
         pixelRatio: 1,
         backgroundColor: showBasemap ? '#ffffff' : null,
-        cacheBust: true
+        cacheBust: true,
+        skipFonts: true,  // Evitar problemas con Google Fonts
+        width: 2400,
+        height: 2400,
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        }
       })
 
-      // Convertir data URL a canvas
-      const img = new Image()
-      await new Promise((resolve, reject) => {
-        img.onload = resolve
-        img.onerror = () => reject(new Error('Error cargando imagen generada'))
-        img.src = dataUrl
+      console.log('🎨 Canvas generado:', {
+        width: canvas.width,
+        height: canvas.height,
+        hasContent: canvas.toDataURL().length > 1000
       })
-
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0)
 
       // Paso 8: Recortar si es necesario (95%)
       setExportProgress(95)
