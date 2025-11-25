@@ -399,16 +399,18 @@ export default function Mapito({ user }) {
       setExportProgress(5)
       setExportStatus('Preparando canvas...')
 
-      // Crear un contenedor temporal COMPLETAMENTE FUERA DEL VIEWPORT
-      // FIX CRÍTICO: top debe ser -9999px, no 0
+      // Crear un contenedor temporal INVISIBLE en el viewport
+      // Leaflet requiere que el div esté en el viewport para renderizar
       tempDiv = document.createElement('div')
       tempDiv.style.width = '2400px'
       tempDiv.style.height = '2400px'
-      tempDiv.style.position = 'absolute'
-      tempDiv.style.left = '-9999px'
-      tempDiv.style.top = '-9999px'  // ✅ FIX: Completamente fuera del viewport
+      tempDiv.style.position = 'fixed'
+      tempDiv.style.left = '0'
+      tempDiv.style.top = '0'
+      tempDiv.style.opacity = '0'  // Invisible pero renderizable
+      tempDiv.style.pointerEvents = 'none'  // No interfiere con UI
+      tempDiv.style.zIndex = '-9999'  // Detrás de todo
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
-      tempDiv.style.zIndex = '-9999'
 
       document.body.appendChild(tempDiv)
       cleanupFunctions.push(() => {
@@ -440,6 +442,9 @@ export default function Mapito({ user }) {
 
       // Forzar a Leaflet a recalcular el tamaño del contenedor
       tempMap.invalidateSize()
+
+      // Dar tiempo a Leaflet para crear el contenedor interno
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       // Asegurar que el contenedor de Leaflet tenga fondo transparente
       const leafletContainer = tempDiv.querySelector('.leaflet-container')
@@ -577,9 +582,22 @@ export default function Mapito({ user }) {
       setExportStatus('Capturando imagen...')
 
       // Obtener el contenedor de Leaflet para capturar
-      const containerToCapture = tempDiv.querySelector('.leaflet-container')
+      let containerToCapture = tempDiv.querySelector('.leaflet-container')
+
+      // Si no se encuentra, esperar un poco más (fallback)
       if (!containerToCapture) {
-        throw new Error('No se pudo encontrar el contenedor de Leaflet')
+        console.warn('Contenedor de Leaflet no encontrado, esperando 500ms más...')
+        await new Promise(resolve => setTimeout(resolve, 500))
+        containerToCapture = tempDiv.querySelector('.leaflet-container')
+      }
+
+      if (!containerToCapture) {
+        console.error('Estado del tempDiv:', {
+          innerHTML: tempDiv.innerHTML.substring(0, 200),
+          childNodes: tempDiv.childNodes.length,
+          classList: Array.from(tempDiv.classList)
+        })
+        throw new Error('No se pudo encontrar el contenedor de Leaflet después de múltiples intentos')
       }
 
       // Usar html-to-image en vez de html2canvas desde CDN
