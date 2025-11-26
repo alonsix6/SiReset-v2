@@ -389,11 +389,16 @@ export default function Mapito({ user }) {
       features: selectedFeatures
     }
 
-    // Calcular bounds de la selección para determinar tamaño óptimo del canvas
+    // Calcular bounds para determinar tamaño óptimo del canvas
+    // Si includeContext está activo, usar bounds de TODO Perú para que no se recorte nada
+    // Si no, solo usar bounds de la selección para optimizar el tamaño
     const selectedGeoJson = L.geoJSON(selectedData)
-    const bounds = selectedGeoJson.getBounds()
+    const boundsSource = includeContext ? L.geoJSON(geoData) : selectedGeoJson
+    const bounds = boundsSource.getBounds()
     const southwest = bounds.getSouthWest()
     const northeast = bounds.getNorthEast()
+
+    console.log('📏 Calculando canvas basado en:', includeContext ? 'TODO Perú (contexto completo)' : 'Solo selección')
 
     // Calcular dimensiones aproximadas en grados
     const latDiff = Math.abs(northeast.lat - southwest.lat)
@@ -617,14 +622,15 @@ export default function Mapito({ user }) {
       setExportProgress(70)
       setExportStatus('Ajustando vista...')
 
-      // FIX CRÍTICO: Calcular bounds SOLO sobre las áreas seleccionadas
-      // Esto asegura que el zoom se centre en la selección, no en todo el contexto
-      const selectedGeoJson = L.geoJSON(selectedData)
-      const bounds = selectedGeoJson.getBounds()  // ✅ FIX: Bounds sobre selección
+      // Calcular bounds para fitBounds
+      // Si includeContext está activo, usar bounds de TODO Perú para que se muestre completo
+      // Si no, solo centrar en la selección
+      const fitBoundsSource = includeContext ? L.geoJSON(geoData) : L.geoJSON(selectedData)
+      const fitBounds = fitBoundsSource.getBounds()
 
       // Aumentar padding significativamente para evitar recortes
       const padding = showBasemap ? [250, 250] : [200, 200]
-      tempMap.fitBounds(bounds, {
+      tempMap.fitBounds(fitBounds, {
         padding: padding,
         maxZoom: 18
       })
