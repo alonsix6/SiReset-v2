@@ -464,6 +464,55 @@ const BoxChart = forwardRef(({
     )
   }
 
+  // ========== CÁLCULO DE LÍMITES DINÁMICOS PARA EJES ==========
+  const visibleData = data.filter(d => d.visible)
+
+  // Extraer valores de CONS y HC
+  const consValues = visibleData.map(d => d.CONS)
+  const hcValues = visibleData.map(d => d.HC)
+
+  // Calcular mínimos y máximos
+  const minCONS = Math.min(...consValues)
+  const maxCONS = Math.max(...consValues)
+  const minHC = Math.min(...hcValues)
+  const maxHC = Math.max(...hcValues)
+
+  // Calcular rangos de datos
+  const consRange = maxCONS - minCONS
+  const hcRange = maxHC - minHC
+
+  // Calcular márgenes: 15% del rango, con un mínimo de 5% para evitar ejes muy ajustados
+  // Esto asegura que las burbujas no tapen los ejes
+  const consMargin = Math.max(consRange * 0.15, 0.05)
+  const hcMargin = Math.max(hcRange * 0.15, 0.05)
+
+  // Definir dominios dinámicos (nunca por debajo de 0)
+  const consDomain = [
+    Math.max(0, minCONS - consMargin),
+    maxCONS + consMargin
+  ]
+
+  const hcDomain = [
+    Math.max(0, minHC - hcMargin),
+    maxHC + hcMargin
+  ]
+
+  // Generar ticks dinámicos (aproximadamente 6-7 ticks por eje)
+  const generateTicks = (min, max, count = 6) => {
+    const range = max - min
+    const step = range / count
+    const ticks = []
+    for (let i = 0; i <= count; i++) {
+      const tick = min + (step * i)
+      // Redondear a 2 decimales para valores limpios
+      ticks.push(Math.round(tick * 100) / 100)
+    }
+    return ticks
+  }
+
+  const consTicks = generateTicks(consDomain[0], consDomain[1], 6)
+  const hcTicks = generateTicks(hcDomain[0], hcDomain[1], 5)
+
   return (
     <div ref={ref} className="w-full">
       {/* Título */}
@@ -501,8 +550,8 @@ const BoxChart = forwardRef(({
             type="number"
             dataKey="CONS"
             name="Consumo"
-            domain={[0, 0.7]}
-            ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]}
+            domain={consDomain}
+            ticks={consTicks}
             tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
             stroke={colorEjeX || '#AAAAAA'}
             tick={{ fill: colorEjeX || '#AAAAAA', fontSize: 14 }}
@@ -519,8 +568,8 @@ const BoxChart = forwardRef(({
             type="number"
             dataKey="HC"
             name="High Consumers"
-            domain={[0, 0.5]}
-            ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5]}
+            domain={hcDomain}
+            ticks={hcTicks}
             tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
             stroke={colorEjeY || '#AAAAAA'}
             tick={{ fill: colorEjeY || '#AAAAAA', fontSize: 14 }}
