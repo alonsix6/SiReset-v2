@@ -466,9 +466,8 @@ export default function Mapito({ user }) {
 
       console.log('✅ Contenedor obtenido exitosamente:', leafletContainer.className)
 
-      // Ahora que el contenedor existe, esconder el div
-      tempDiv.style.opacity = '0'
-      tempDiv.style.zIndex = '-9999'
+      // IMPORTANTE: NO esconder el div todavía - necesita ser visible para renderizar las capas
+      // Lo esconderemos DESPUÉS de capturar la imagen
 
       // Asegurar que el contenedor de Leaflet tenga fondo transparente
       if (!showBasemap) {
@@ -617,6 +616,15 @@ export default function Mapito({ user }) {
         height: containerToCapture.offsetHeight
       })
 
+      // IMPORTANTE: El div debe estar VISIBLE durante la captura
+      // Verificar que no esté escondido
+      if (tempDiv.style.opacity === '0') {
+        console.warn('⚠️ El div está escondido, haciéndolo visible para captura')
+        tempDiv.style.opacity = '1'
+        tempDiv.style.zIndex = '99999'
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
       // Usar toCanvas de html-to-image (más directo, evita problemas de CORS)
       const canvas = await toCanvas(containerToCapture, {
         quality: 1.0,
@@ -637,6 +645,11 @@ export default function Mapito({ user }) {
         height: canvas.height,
         hasContent: canvas.toDataURL().length > 1000
       })
+
+      // Ahora sí esconder el div (ya capturamos)
+      tempDiv.style.opacity = '0'
+      tempDiv.style.zIndex = '-9999'
+      console.log('👻 Div escondido después de captura')
 
       // Paso 8: Recortar si es necesario (95%)
       setExportProgress(95)
