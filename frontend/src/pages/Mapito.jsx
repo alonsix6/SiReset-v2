@@ -389,6 +389,47 @@ export default function Mapito({ user }) {
       features: selectedFeatures
     }
 
+    // Calcular bounds de la selección para determinar tamaño óptimo del canvas
+    const selectedGeoJson = L.geoJSON(selectedData)
+    const bounds = selectedGeoJson.getBounds()
+    const southwest = bounds.getSouthWest()
+    const northeast = bounds.getNorthEast()
+
+    // Calcular dimensiones aproximadas en grados
+    const latDiff = Math.abs(northeast.lat - southwest.lat)
+    const lngDiff = Math.abs(northeast.lng - southwest.lng)
+
+    // Determinar orientación y tamaño base
+    const aspectRatio = lngDiff / latDiff
+    let canvasWidth, canvasHeight
+
+    // Base de 2400px para el lado más largo, con margen de seguridad del 40%
+    const baseSize = 2400
+    const safetyMargin = 1.4  // 40% extra de espacio
+
+    if (aspectRatio > 1) {
+      // Más ancho que alto
+      canvasWidth = Math.round(baseSize * safetyMargin)
+      canvasHeight = Math.round((baseSize / aspectRatio) * safetyMargin)
+    } else {
+      // Más alto que ancho
+      canvasHeight = Math.round(baseSize * safetyMargin)
+      canvasWidth = Math.round((baseSize * aspectRatio) * safetyMargin)
+    }
+
+    // Asegurar mínimo de 1200px y máximo de 4800px
+    canvasWidth = Math.max(1200, Math.min(4800, canvasWidth))
+    canvasHeight = Math.max(1200, Math.min(4800, canvasHeight))
+
+    console.log('📐 Tamaño calculado del canvas:', {
+      latDiff: latDiff.toFixed(2),
+      lngDiff: lngDiff.toFixed(2),
+      aspectRatio: aspectRatio.toFixed(2),
+      width: canvasWidth,
+      height: canvasHeight,
+      safetyMargin: '40%'
+    })
+
     let tempDiv = null
     let tempMap = null
     let tileLayer = null
@@ -402,8 +443,8 @@ export default function Mapito({ user }) {
       // Crear un contenedor temporal VISIBLE primero (Leaflet necesita visibilidad para crear el contenedor)
       tempDiv = document.createElement('div')
       tempDiv.id = `mapito-export-${Date.now()}`  // ID único
-      tempDiv.style.width = '2400px'
-      tempDiv.style.height = '2400px'
+      tempDiv.style.width = `${canvasWidth}px`
+      tempDiv.style.height = `${canvasHeight}px`
       tempDiv.style.position = 'fixed'
       tempDiv.style.left = '0'
       tempDiv.style.top = '0'
@@ -632,8 +673,8 @@ export default function Mapito({ user }) {
         backgroundColor: showBasemap ? '#ffffff' : null,
         cacheBust: true,
         skipFonts: true,  // Evitar problemas con Google Fonts
-        width: 2400,
-        height: 2400,
+        width: canvasWidth,
+        height: canvasHeight,
         style: {
           transform: 'scale(1)',
           transformOrigin: 'top left'
