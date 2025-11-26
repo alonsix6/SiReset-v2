@@ -403,23 +403,23 @@ export default function Mapito({ user }) {
     const aspectRatio = lngDiff / latDiff
     let canvasWidth, canvasHeight
 
-    // Base de 2400px para el lado más largo, con margen de seguridad del 40%
-    const baseSize = 2400
-    const safetyMargin = 1.4  // 40% extra de espacio
+    // Base de 3000px para el lado más largo, con margen de seguridad del 60%
+    const baseSize = 3000
+    const safetyMargin = 1.6  // 60% extra de espacio (aumentado para mayor margen)
 
     if (aspectRatio > 1) {
       // Más ancho que alto
-      canvasWidth = Math.round(baseSize * safetyMargin)
-      canvasHeight = Math.round((baseSize / aspectRatio) * safetyMargin)
+      canvasWidth = Math.round(baseSize * aspectRatio * safetyMargin)
+      canvasHeight = Math.round(baseSize * safetyMargin)
     } else {
       // Más alto que ancho
       canvasHeight = Math.round(baseSize * safetyMargin)
-      canvasWidth = Math.round((baseSize * aspectRatio) * safetyMargin)
+      canvasWidth = Math.round(baseSize * aspectRatio * safetyMargin)
     }
 
-    // Asegurar mínimo de 1200px y máximo de 4800px
-    canvasWidth = Math.max(1200, Math.min(4800, canvasWidth))
-    canvasHeight = Math.max(1200, Math.min(4800, canvasHeight))
+    // Asegurar mínimo de 1500px y máximo de 6000px
+    canvasWidth = Math.max(1500, Math.min(6000, canvasWidth))
+    canvasHeight = Math.max(1500, Math.min(6000, canvasHeight))
 
     console.log('📐 Tamaño calculado del canvas:', {
       latDiff: latDiff.toFixed(2),
@@ -427,7 +427,8 @@ export default function Mapito({ user }) {
       aspectRatio: aspectRatio.toFixed(2),
       width: canvasWidth,
       height: canvasHeight,
-      safetyMargin: '40%'
+      baseSize: baseSize,
+      safetyMargin: '60%'
     })
 
     let tempDiv = null
@@ -621,7 +622,8 @@ export default function Mapito({ user }) {
       const selectedGeoJson = L.geoJSON(selectedData)
       const bounds = selectedGeoJson.getBounds()  // ✅ FIX: Bounds sobre selección
 
-      const padding = showBasemap ? [100, 100] : [50, 50]
+      // Aumentar padding significativamente para evitar recortes
+      const padding = showBasemap ? [250, 250] : [200, 200]
       tempMap.fitBounds(bounds, {
         padding: padding,
         maxZoom: 18
