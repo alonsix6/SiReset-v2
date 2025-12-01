@@ -17,6 +17,7 @@ export default function Layout({ user, onLogout, children }) {
     { name: 'The Box', path: '/thebox', icon: '▶' },
     { name: 'BenchBox', path: '/benchbox', icon: '▶' },
     { name: 'AfiniMap', path: '/afinimap', icon: '▶' },
+    { name: 'Ruteo', path: '/ruteo', icon: '▶' },
   ]
 
   // Navegación principal (Dashboard)
