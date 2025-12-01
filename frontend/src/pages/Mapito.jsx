@@ -532,10 +532,12 @@ export default function Mapito({ user }) {
       if (showBasemap) {
         setExportStatus('Cargando mapa base...')
 
-        // FIX CRÍTICO: Agregar crossOrigin para evitar problemas CORS
-        tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // FIX: Usar CartoDB tiles en lugar de OpenStreetMap
+        // CartoDB tiene mejor soporte CORS y es más confiable para exportación
+        tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
           maxZoom: 19,
-          crossOrigin: 'anonymous'  // ✅ FIX: Permitir captura con html2canvas
+          crossOrigin: 'anonymous',
+          subdomains: 'abcd'
         })
 
         // Detectar carga real de tiles con evento 'load'
@@ -675,7 +677,7 @@ export default function Mapito({ user }) {
       // El div está dentro del viewport (opacity: 0.01, z-index: -9999)
       // html-to-image puede capturar correctamente porque está "visible"
 
-      // Usar toCanvas de html-to-image (más directo, evita problemas de CORS)
+      // Usar toCanvas de html-to-image con soporte CORS
       const canvas = await toCanvas(containerToCapture, {
         quality: 1.0,
         pixelRatio: 1,
@@ -684,6 +686,21 @@ export default function Mapito({ user }) {
         skipFonts: true,  // Evitar problemas con Google Fonts
         width: canvasWidth,
         height: canvasHeight,
+        // FIX: Opciones adicionales para manejar CORS e imágenes externas
+        useCORS: true,
+        allowTaint: false,
+        // Filtrar elementos problemáticos (tiles que fallan CORS)
+        filter: (node) => {
+          // Excluir imágenes que puedan causar problemas CORS
+          if (node.tagName === 'IMG') {
+            const src = node.src || ''
+            // Si es un tile que no se cargó correctamente, excluirlo
+            if (src.includes('tile') && !node.complete) {
+              return false
+            }
+          }
+          return true
+        },
         style: {
           transform: 'scale(1)',
           transformOrigin: 'top left'
@@ -1350,8 +1367,9 @@ export default function Mapito({ user }) {
                   >
                     {showBasemap && (
                       <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+                        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                        subdomains="abcd"
                       />
                     )}
 
