@@ -9,9 +9,7 @@ export default function Ruteo({ user }) {
       descripcion: 'Generador de UTMs para campañas San Fernando',
       url: 'https://ruteo-sf.netlify.app/',
       logo: 'SF',
-      colorFrom: 'from-red-600',
-      colorTo: 'to-red-800',
-      borderColor: 'border-red-500',
+      color: '#024b98',
       activo: true
     },
     {
@@ -20,9 +18,7 @@ export default function Ruteo({ user }) {
       descripcion: 'Generador de UTMs para campañas Auna',
       url: null,
       logo: 'AU',
-      colorFrom: 'from-blue-500',
-      colorTo: 'to-blue-700',
-      borderColor: 'border-blue-500',
+      color: '#00afca',
       activo: false
     },
     {
@@ -31,9 +27,7 @@ export default function Ruteo({ user }) {
       descripcion: 'Generador de UTMs para campañas Los Andes',
       url: null,
       logo: 'LA',
-      colorFrom: 'from-emerald-600',
-      colorTo: 'to-emerald-800',
-      borderColor: 'border-emerald-500',
+      color: '#ff287a',
       activo: false
     },
     {
@@ -42,9 +36,7 @@ export default function Ruteo({ user }) {
       descripcion: 'Próximamente disponible',
       url: null,
       logo: '+',
-      colorFrom: 'from-reset-gray-medium',
-      colorTo: 'to-reset-gray-dark',
-      borderColor: 'border-reset-gray-medium',
+      color: '#666666',
       activo: false
     }
   ]
@@ -65,12 +57,11 @@ export default function Ruteo({ user }) {
               // GENERADORES DE UTMs
             </span>
           </div>
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl text-reset-white mb-3 leading-tight">
-            <span className="text-gradient-neon">RUTEO</span>
+          <h1 className="font-display text-4xl lg:text-6xl text-reset-white mt-2">
+            RUTEO
           </h1>
-          <p className="text-reset-gray-light text-base lg:text-lg max-w-2xl">
+          <p className="text-reset-gray-light text-base lg:text-lg max-w-2xl mt-3">
             Herramientas de generación de UTMs organizadas por marca.
-            Selecciona una marca para acceder a su generador personalizado.
           </p>
         </div>
 
@@ -98,20 +89,26 @@ export default function Ruteo({ user }) {
               className={`
                 group relative overflow-hidden rounded-reset border
                 ${marca.activo
-                  ? `${marca.borderColor} cursor-pointer hover:shadow-lg hover:shadow-${marca.borderColor}/20 hover:scale-[1.02]`
+                  ? 'cursor-pointer hover:shadow-lg hover:scale-[1.02]'
                   : 'border-reset-gray-medium opacity-60 cursor-not-allowed'
                 }
                 bg-reset-gray-dark transition-all duration-300 animate-fade-in-up
               `}
-              style={{ animationDelay: `${0.1 + index * 0.05}s` }}
+              style={{
+                animationDelay: `${0.1 + index * 0.05}s`,
+                borderColor: marca.activo ? marca.color : undefined
+              }}
             >
               <div className="flex items-center p-5">
                 {/* Logo/Icono de la marca */}
-                <div className={`
-                  flex-shrink-0 w-16 h-16 rounded-lg bg-gradient-to-br ${marca.colorFrom} ${marca.colorTo}
-                  flex items-center justify-center mr-4
-                  ${marca.activo ? 'group-hover:scale-110' : ''} transition-transform duration-300
-                `}>
+                <div
+                  className={`
+                    flex-shrink-0 w-16 h-16 rounded-lg
+                    flex items-center justify-center mr-4
+                    ${marca.activo ? 'group-hover:scale-110' : ''} transition-transform duration-300
+                  `}
+                  style={{ backgroundColor: marca.color }}
+                >
                   <span className="font-display text-2xl text-white font-bold">
                     {marca.logo}
                   </span>
@@ -163,8 +160,9 @@ export default function Ruteo({ user }) {
 
               {/* Barra de estado inferior */}
               {marca.activo && (
-                <div className={`h-1 bg-gradient-to-r ${marca.colorFrom} ${marca.colorTo}
-                  transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left`}
+                <div
+                  className="h-1 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"
+                  style={{ backgroundColor: marca.color }}
                 />
               )}
             </div>
@@ -172,7 +170,7 @@ export default function Ruteo({ user }) {
         </div>
 
         {/* Stats */}
-        <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+        <div className="mt-10 grid grid-cols-3 gap-4 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
           <div className="bg-reset-gray-dark rounded-reset p-4 text-center border border-reset-gray-medium">
             <div className="text-3xl font-display text-reset-neon">
               {marcas.filter(m => m.activo).length}
@@ -195,14 +193,6 @@ export default function Ruteo({ user }) {
             </div>
             <div className="text-reset-gray-light text-xs uppercase tracking-wide mt-1">
               Total marcas
-            </div>
-          </div>
-          <div className="bg-reset-gray-dark rounded-reset p-4 text-center border border-reset-gray-medium">
-            <div className="text-3xl font-display text-reset-magenta">
-              UTM
-            </div>
-            <div className="text-reset-gray-light text-xs uppercase tracking-wide mt-1">
-              Generadores
             </div>
           </div>
         </div>
