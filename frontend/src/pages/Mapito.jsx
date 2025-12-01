@@ -446,22 +446,23 @@ export default function Mapito({ user }) {
       setExportProgress(5)
       setExportStatus('Preparando canvas...')
 
-      // Crear un contenedor temporal FUERA DEL VIEWPORT
-      // Leaflet necesita que el elemento sea "visible" (no display:none) para renderizar
-      // pero lo posicionamos fuera de la pantalla para que el usuario no lo vea
+      // FIX: Crear contenedor DENTRO del viewport pero visualmente oculto
+      // html-to-image necesita que el elemento esté dentro del viewport para capturarlo
+      // Lo hacemos casi invisible (opacity muy baja) y detrás de todo (z-index negativo)
       tempDiv = document.createElement('div')
       tempDiv.id = `mapito-export-${Date.now()}`  // ID único
       tempDiv.style.width = `${canvasWidth}px`
       tempDiv.style.height = `${canvasHeight}px`
       tempDiv.style.position = 'fixed'
-      // Posicionar FUERA del viewport (a la izquierda, invisible para el usuario)
-      tempDiv.style.left = '-99999px'
+      // FIX: Posicionar DENTRO del viewport (esquina superior izquierda)
+      tempDiv.style.left = '0'
       tempDiv.style.top = '0'
-      tempDiv.style.zIndex = '-1'  // Detrás de todo, por si acaso
+      // FIX: Casi invisible pero técnicamente visible para que renderice
+      tempDiv.style.opacity = '0.01'
+      tempDiv.style.zIndex = '-9999'  // Muy atrás de todo
       tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
       tempDiv.style.pointerEvents = 'none'  // No interfiere con UI
       tempDiv.style.overflow = 'hidden'  // Evitar scroll
-      // Importante: NO usar opacity:0 ni visibility:hidden porque Leaflet no renderizaría
 
       document.body.appendChild(tempDiv)
       cleanupFunctions.push(() => {
@@ -475,10 +476,12 @@ export default function Mapito({ user }) {
       setExportStatus('Inicializando mapa...')
 
       // Crear mapa usando el ID en lugar de la referencia directa
+      // FIX: preferCanvas: true para que los polígonos se rendericen en Canvas
+      // Esto hace la captura con html-to-image mucho más confiable que SVG
       tempMap = L.map(tempDiv.id, {
         zoomControl: false,
         attributionControl: false,
-        preferCanvas: false
+        preferCanvas: true  // FIX: Usar Canvas en lugar de SVG para mejor captura
       }).setView([-9.2, -75.0], 5)
 
       cleanupFunctions.push(() => {
@@ -517,8 +520,8 @@ export default function Mapito({ user }) {
 
       console.log('✅ Contenedor obtenido exitosamente:', leafletContainer.className)
 
-      // El div está fuera del viewport (left: -99999px) pero Leaflet lo considera visible
-      // y puede renderizar las capas correctamente
+      // El div está dentro del viewport pero casi invisible (opacity: 0.01)
+      // Esto permite que html-to-image capture correctamente los píxeles
 
       // Asegurar que el contenedor de Leaflet tenga fondo transparente
       if (!showBasemap) {
@@ -669,9 +672,8 @@ export default function Mapito({ user }) {
         height: containerToCapture.offsetHeight
       })
 
-      // El div está posicionado fuera del viewport (left: -99999px)
-      // Leaflet lo considera "visible" y renderiza correctamente
-      // pero el usuario no lo ve en pantalla
+      // El div está dentro del viewport (opacity: 0.01, z-index: -9999)
+      // html-to-image puede capturar correctamente porque está "visible"
 
       // Usar toCanvas de html-to-image (más directo, evita problemas de CORS)
       const canvas = await toCanvas(containerToCapture, {
@@ -694,8 +696,7 @@ export default function Mapito({ user }) {
         hasContent: canvas.toDataURL().length > 1000
       })
 
-      // El div ya estaba fuera del viewport, no necesitamos esconderlo
-      // Se limpiará automáticamente en cleanupFunctions
+      // El div se limpiará automáticamente en cleanupFunctions
 
       // Paso 8: Recortar si es necesario (95%)
       setExportProgress(95)
