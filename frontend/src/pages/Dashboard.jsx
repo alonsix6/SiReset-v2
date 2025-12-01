@@ -46,6 +46,15 @@ export default function Dashboard({ user }) {
       gradient: 'from-yellow-500 to-orange-500',
       borderColor: 'border-yellow-500',
       path: '/afinimap'
+    },
+    {
+      code: 'Ruteo',
+      title: 'RUTEO',
+      description: 'Generadores de UTMs por marca - Links de campañas',
+      icon: '▶',
+      gradient: 'from-red-500 to-orange-600',
+      borderColor: 'border-red-500',
+      path: '/ruteo'
     }
   ]
 

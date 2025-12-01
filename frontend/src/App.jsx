@@ -11,6 +11,7 @@ import Mapito from './pages/Mapito'
 import TheBox from './pages/TheBox'
 import BenchBox from './pages/BenchBox'
 import AfiniMap from './pages/AfiniMap'
+import Ruteo from './pages/Ruteo'
 import Admin from './pages/Admin'
 import Layout from './components/Layout'
 
@@ -191,6 +192,11 @@ function App() {
       <Route path="/afinimap" element={
         <Layout user={user} onLogout={handleLogout}>
           <AfiniMap user={user} />
+        </Layout>
+      } />
+      <Route path="/ruteo" element={
+        <Layout user={user} onLogout={handleLogout}>
+          <Ruteo user={user} />
         </Layout>
       } />
       <Route path="/admin" element={
