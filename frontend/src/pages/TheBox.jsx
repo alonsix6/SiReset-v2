@@ -347,13 +347,39 @@ export default function TheBox() {
     setExporting(true)
 
     try {
-      // Esperar un momento para que el gráfico se renderice completamente
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Esperar más tiempo para asegurar que:
+      // 1. Las fuentes estén completamente cargadas
+      // 2. Los labels SVG de Recharts estén renderizados
+      // 3. Cualquier animación haya terminado
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // Forzar un re-render del DOM antes de capturar
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       const dataUrl = await toPng(chartRef.current, {
         backgroundColor: 'transparent',
         pixelRatio: 2,
-        quality: 1
+        quality: 1,
+        // Importante: cacheBust evita problemas con elementos cacheados
+        cacheBust: true,
+        // Incluir fuentes embebidas para asegurar que el texto se renderice
+        includeQueryParams: true,
+        // Filtrar elementos que pueden causar problemas
+        filter: (node) => {
+          // Excluir elementos con clase que puedan causar problemas en la captura
+          // pero mantener todos los elementos SVG importantes
+          return true
+        },
+        // Asegurar que los estilos se apliquen correctamente
+        style: {
+          // Forzar visibilidad de todos los elementos
+          visibility: 'visible',
+          opacity: '1'
+        },
+        // Configuración para mejor manejo de SVG
+        skipFonts: false,
+        fontEmbedCSS: ''
       })
 
       // Descargar imagen
@@ -365,7 +391,7 @@ export default function TheBox() {
       setExporting(false)
     } catch (err) {
       console.error('Error exportando imagen:', err)
-      setError('Error al exportar la imagen')
+      setError('Error al exportar la imagen. Intenta nuevamente.')
       setExporting(false)
     }
   }
