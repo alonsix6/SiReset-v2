@@ -369,8 +369,8 @@ export default function Mapito({ user }) {
 
   /**
    * Función compartida para generar imagen del mapa
-   * Elimina duplicación de código entre exportToPng y copyToClipboard
-   * Implementa detección real de carga de tiles y reporta progreso
+   * NOTA: No incluye tiles del mapa base para evitar problemas CORS
+   * El mapa base se ve en la previsualización pero la exportación es solo polígonos
    */
   const generateMapImage = async () => {
     // Validación inicial
@@ -390,8 +390,6 @@ export default function Mapito({ user }) {
     }
 
     // Calcular bounds para determinar tamaño óptimo del canvas
-    // Si includeContext está activo, usar bounds de TODO Perú para que no se recorte nada
-    // Si no, solo usar bounds de la selección para optimizar el tamaño
     const selectedGeoJson = L.geoJSON(selectedData)
     const boundsSource = includeContext ? L.geoJSON(geoData) : selectedGeoJson
     const bounds = boundsSource.getBounds()
@@ -408,61 +406,46 @@ export default function Mapito({ user }) {
     const aspectRatio = lngDiff / latDiff
     let canvasWidth, canvasHeight
 
-    // Base de 3000px para el lado más largo, con margen de seguridad del 60%
-    const baseSize = 3000
-    const safetyMargin = 1.6  // 60% extra de espacio (aumentado para mayor margen)
+    // Base de 2000px para el lado más largo (reducido para mejor rendimiento)
+    const baseSize = 2000
+    const safetyMargin = 1.4
 
     if (aspectRatio > 1) {
-      // Más ancho que alto
       canvasWidth = Math.round(baseSize * aspectRatio * safetyMargin)
       canvasHeight = Math.round(baseSize * safetyMargin)
     } else {
-      // Más alto que ancho
       canvasHeight = Math.round(baseSize * safetyMargin)
       canvasWidth = Math.round(baseSize * aspectRatio * safetyMargin)
     }
 
-    // Asegurar mínimo de 1500px y máximo de 6000px
-    canvasWidth = Math.max(1500, Math.min(6000, canvasWidth))
-    canvasHeight = Math.max(1500, Math.min(6000, canvasHeight))
+    // Asegurar mínimo de 1000px y máximo de 4000px
+    canvasWidth = Math.max(1000, Math.min(4000, canvasWidth))
+    canvasHeight = Math.max(1000, Math.min(4000, canvasHeight))
 
-    console.log('📐 Tamaño calculado del canvas:', {
-      latDiff: latDiff.toFixed(2),
-      lngDiff: lngDiff.toFixed(2),
-      aspectRatio: aspectRatio.toFixed(2),
-      width: canvasWidth,
-      height: canvasHeight,
-      baseSize: baseSize,
-      safetyMargin: '60%'
-    })
+    console.log('📐 Tamaño del canvas:', { width: canvasWidth, height: canvasHeight })
 
     let tempDiv = null
     let tempMap = null
-    let tileLayer = null
     let cleanupFunctions = []
 
     try {
-      // Paso 1: Crear contenedor (5%)
-      setExportProgress(5)
+      // Paso 1: Crear contenedor (10%)
+      setExportProgress(10)
       setExportStatus('Preparando canvas...')
 
-      // FIX: Crear contenedor DENTRO del viewport pero visualmente oculto
-      // html-to-image necesita que el elemento esté dentro del viewport para capturarlo
-      // Lo hacemos casi invisible (opacity muy baja) y detrás de todo (z-index negativo)
       tempDiv = document.createElement('div')
-      tempDiv.id = `mapito-export-${Date.now()}`  // ID único
+      tempDiv.id = `mapito-export-${Date.now()}`
       tempDiv.style.width = `${canvasWidth}px`
       tempDiv.style.height = `${canvasHeight}px`
       tempDiv.style.position = 'fixed'
-      // FIX: Posicionar DENTRO del viewport (esquina superior izquierda)
       tempDiv.style.left = '0'
       tempDiv.style.top = '0'
-      // FIX: Casi invisible pero técnicamente visible para que renderice
       tempDiv.style.opacity = '0.01'
-      tempDiv.style.zIndex = '-9999'  // Muy atrás de todo
-      tempDiv.style.backgroundColor = showBasemap ? '#ffffff' : 'transparent'
-      tempDiv.style.pointerEvents = 'none'  // No interfiere con UI
-      tempDiv.style.overflow = 'hidden'  // Evitar scroll
+      tempDiv.style.zIndex = '-9999'
+      // Fondo blanco si showBasemap, transparente si no
+      tempDiv.style.backgroundColor = showBasemap ? '#f8f9fa' : 'transparent'
+      tempDiv.style.pointerEvents = 'none'
+      tempDiv.style.overflow = 'hidden'
 
       document.body.appendChild(tempDiv)
       cleanupFunctions.push(() => {
@@ -471,17 +454,15 @@ export default function Mapito({ user }) {
         }
       })
 
-      // Paso 2: Crear mapa (10%)
-      setExportProgress(10)
+      // Paso 2: Crear mapa (30%)
+      setExportProgress(30)
       setExportStatus('Inicializando mapa...')
 
-      // Crear mapa usando el ID en lugar de la referencia directa
-      // FIX: preferCanvas: true para que los polígonos se rendericen en Canvas
-      // Esto hace la captura con html-to-image mucho más confiable que SVG
+      // Usar SVG (preferCanvas: false) - más confiable para captura sin tiles
       tempMap = L.map(tempDiv.id, {
         zoomControl: false,
         attributionControl: false,
-        preferCanvas: true  // FIX: Usar Canvas en lugar de SVG para mejor captura
+        preferCanvas: false  // SVG es más confiable sin tiles
       }).setView([-9.2, -75.0], 5)
 
       cleanupFunctions.push(() => {
@@ -495,118 +476,26 @@ export default function Mapito({ user }) {
         }
       })
 
-      // Forzar a Leaflet a recalcular el tamaño del contenedor
       tempMap.invalidateSize()
 
-      console.log('🔍 Estado inicial después de crear mapa:', {
-        mapCreated: !!tempMap,
-        divId: tempDiv.id,
-        divInDOM: document.body.contains(tempDiv),
-        divChildren: tempDiv.childNodes.length,
-        containerClassName: tempMap.getContainer()?.className
-      })
-
-      // El contenedor ES tempDiv mismo (Leaflet le agrega la clase)
-      // No es un hijo de tempDiv, por eso querySelector falla
       const leafletContainer = tempMap.getContainer()
-
       if (!leafletContainer) {
-        console.error('❌ getContainer() devolvió null:', {
-          tempMap: !!tempMap,
-          tempDiv: !!tempDiv
-        })
-        throw new Error('Leaflet.getContainer() devolvió null inesperadamente')
+        throw new Error('Leaflet.getContainer() devolvió null')
       }
 
-      console.log('✅ Contenedor obtenido exitosamente:', leafletContainer.className)
+      // Establecer fondo del contenedor
+      leafletContainer.style.backgroundColor = showBasemap ? '#f8f9fa' : 'transparent'
 
-      // El div está dentro del viewport pero casi invisible (opacity: 0.01)
-      // Esto permite que html-to-image capture correctamente los píxeles
+      // NO agregamos TileLayer - esto evita completamente el problema CORS
+      // El mapa base solo se ve en la previsualización
 
-      // Asegurar que el contenedor de Leaflet tenga fondo transparente
-      if (!showBasemap) {
-        leafletContainer.style.backgroundColor = 'transparent'
-      }
-
-      // Paso 3: Agregar TileLayer con detección de carga (15-50%)
-      if (showBasemap) {
-        setExportStatus('Cargando mapa base...')
-
-        // FIX: Usar CartoDB tiles en lugar de OpenStreetMap
-        // CartoDB tiene mejor soporte CORS y es más confiable para exportación
-        tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-          crossOrigin: 'anonymous',
-          subdomains: 'abcd'
-        })
-
-        // Detectar carga real de tiles con evento 'load'
-        await new Promise((resolve, reject) => {
-          let tilesLoaded = 0
-          let tilesToLoad = 0
-          let isResolved = false
-
-          const checkComplete = () => {
-            if (isResolved) return
-
-            const progress = tilesToLoad > 0
-              ? 15 + Math.floor((tilesLoaded / tilesToLoad) * 35)
-              : 50
-            setExportProgress(Math.min(progress, 50))
-
-            if (tilesLoaded >= tilesToLoad && tilesToLoad > 0) {
-              isResolved = true
-              setExportProgress(50)
-              resolve()
-            }
-          }
-
-          tileLayer.on('tileloadstart', () => {
-            tilesToLoad++
-          })
-
-          tileLayer.on('tileload', () => {
-            tilesLoaded++
-            checkComplete()
-          })
-
-          tileLayer.on('tileerror', () => {
-            tilesLoaded++
-            checkComplete()
-          })
-
-          tileLayer.addTo(tempMap)
-
-          // Timeout de seguridad mejorado
-          setTimeout(() => {
-            if (!isResolved) {
-              isResolved = true
-              console.warn('Timeout esperando tiles, continuando...')
-              setExportProgress(50)
-              resolve()
-            }
-          }, 5000)
-
-          // Si no hay tiles para cargar, resolver inmediatamente
-          setTimeout(() => {
-            if (tilesToLoad === 0) {
-              isResolved = true
-              setExportProgress(50)
-              resolve()
-            }
-          }, 100)
-        })
-      } else {
-        setExportProgress(50)
-      }
-
-      // Paso 4: Agregar GeoJSON (60%)
-      setExportProgress(60)
+      // Paso 3: Agregar GeoJSON (50%)
+      setExportProgress(50)
       setExportStatus('Renderizando áreas...')
 
       const dataToRender = includeContext ? geoData : selectedData
 
-      const geoJsonLayer = L.geoJSON(dataToRender, {
+      L.geoJSON(dataToRender, {
         style: (feature) => {
           if (includeContext) {
             const selected = isSelected(feature)
@@ -627,107 +516,67 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      // Paso 5: Ajustar bounds (70%)
+      // Paso 4: Ajustar bounds (70%)
       setExportProgress(70)
       setExportStatus('Ajustando vista...')
 
-      // Calcular bounds para fitBounds
-      // Si includeContext está activo, usar bounds de TODO Perú para que se muestre completo
-      // Si no, solo centrar en la selección
       const fitBoundsSource = includeContext ? L.geoJSON(geoData) : L.geoJSON(selectedData)
       const fitBounds = fitBoundsSource.getBounds()
 
-      // Aumentar padding significativamente para evitar recortes
-      const padding = showBasemap ? [250, 250] : [200, 200]
       tempMap.fitBounds(fitBounds, {
-        padding: padding,
+        padding: [150, 150],
         maxZoom: 18
       })
 
-      // Forzar actualización del mapa después de agregar las capas
       tempMap.invalidateSize()
 
-      // Paso 6: Esperar estabilización (80%)
+      // Paso 5: Esperar renderizado (80%)
       setExportProgress(80)
       setExportStatus('Esperando renderizado...')
 
-      // Dar tiempo adicional para que Leaflet termine de renderizar
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      // Una última invalidación antes de capturar
+      // Dar tiempo para que SVG se renderice completamente
+      await new Promise(resolve => setTimeout(resolve, 500))
       tempMap.invalidateSize()
 
-      // Paso 7: Capturar imagen (90%)
+      // Paso 6: Capturar imagen (90%)
       setExportProgress(90)
       setExportStatus('Capturando imagen...')
 
-      // Obtener el contenedor de Leaflet para capturar
-      // Usamos getContainer() porque el div ES el contenedor
       const containerToCapture = tempMap.getContainer()
       if (!containerToCapture) {
-        throw new Error('El contenedor de Leaflet desapareció inesperadamente')
+        throw new Error('El contenedor desapareció')
       }
 
-      console.log('📸 Capturando contenedor:', {
-        className: containerToCapture.className,
+      console.log('📸 Capturando:', {
         width: containerToCapture.offsetWidth,
         height: containerToCapture.offsetHeight
       })
 
-      // El div está dentro del viewport (opacity: 0.01, z-index: -9999)
-      // html-to-image puede capturar correctamente porque está "visible"
-
-      // Usar toCanvas de html-to-image con soporte CORS
+      // Capturar con toCanvas - ahora sin tiles no hay problema CORS
       const canvas = await toCanvas(containerToCapture, {
         quality: 1.0,
-        pixelRatio: 1,
-        backgroundColor: showBasemap ? '#ffffff' : null,
+        pixelRatio: 2,  // Mayor resolución
+        backgroundColor: showBasemap ? '#f8f9fa' : null,
         cacheBust: true,
-        skipFonts: true,  // Evitar problemas con Google Fonts
+        skipFonts: true,
         width: canvasWidth,
-        height: canvasHeight,
-        // FIX: Opciones adicionales para manejar CORS e imágenes externas
-        useCORS: true,
-        allowTaint: false,
-        // Filtrar elementos problemáticos (tiles que fallan CORS)
-        filter: (node) => {
-          // Excluir imágenes que puedan causar problemas CORS
-          if (node.tagName === 'IMG') {
-            const src = node.src || ''
-            // Si es un tile que no se cargó correctamente, excluirlo
-            if (src.includes('tile') && !node.complete) {
-              return false
-            }
-          }
-          return true
-        },
-        style: {
-          transform: 'scale(1)',
-          transformOrigin: 'top left'
-        }
+        height: canvasHeight
       })
 
       console.log('🎨 Canvas generado:', {
         width: canvas.width,
-        height: canvas.height,
-        hasContent: canvas.toDataURL().length > 1000
+        height: canvas.height
       })
 
-      // El div se limpiará automáticamente en cleanupFunctions
-
-      // Paso 8: Recortar si es necesario (95%)
+      // Paso 7: Optimizar (95%)
       setExportProgress(95)
       setExportStatus('Optimizando imagen...')
 
       const finalCanvas = showBasemap ? canvas : cropCanvas(canvas)
 
-      // Cleanup antes de retornar
+      // Cleanup
       cleanupFunctions.forEach(fn => {
-        try {
-          fn()
-        } catch (e) {
-          console.error('Error en cleanup:', e)
-        }
+        try { fn() } catch (e) { console.error('Cleanup error:', e) }
       })
 
       setExportProgress(100)
@@ -736,13 +585,8 @@ export default function Mapito({ user }) {
       return finalCanvas
 
     } catch (error) {
-      // Ejecutar cleanup en caso de error
       cleanupFunctions.forEach(fn => {
-        try {
-          fn()
-        } catch (e) {
-          console.error('Error en cleanup:', e)
-        }
+        try { fn() } catch (e) { console.error('Cleanup error:', e) }
       })
       throw error
     }
