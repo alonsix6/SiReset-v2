@@ -370,7 +370,7 @@ export default function Mapito({ user }) {
   /**
    * Función compartida para generar imagen del mapa
    * NOTA: No incluye tiles del mapa base para evitar problemas CORS
-   * El mapa base se ve en la previsualización pero la exportación es solo polígonos
+   * El div debe estar VISIBLE para que Leaflet renderice correctamente
    */
   const generateMapImage = async () => {
     // Validación inicial
@@ -396,8 +396,6 @@ export default function Mapito({ user }) {
     const southwest = bounds.getSouthWest()
     const northeast = bounds.getNorthEast()
 
-    console.log('📏 Calculando canvas basado en:', includeContext ? 'TODO Perú (contexto completo)' : 'Solo selección')
-
     // Calcular dimensiones aproximadas en grados
     const latDiff = Math.abs(northeast.lat - southwest.lat)
     const lngDiff = Math.abs(northeast.lng - southwest.lng)
@@ -406,9 +404,8 @@ export default function Mapito({ user }) {
     const aspectRatio = lngDiff / latDiff
     let canvasWidth, canvasHeight
 
-    // Base de 2000px para el lado más largo (reducido para mejor rendimiento)
-    const baseSize = 2000
-    const safetyMargin = 1.4
+    const baseSize = 3000
+    const safetyMargin = 1.6
 
     if (aspectRatio > 1) {
       canvasWidth = Math.round(baseSize * aspectRatio * safetyMargin)
@@ -418,9 +415,8 @@ export default function Mapito({ user }) {
       canvasWidth = Math.round(baseSize * aspectRatio * safetyMargin)
     }
 
-    // Asegurar mínimo de 1000px y máximo de 4000px
-    canvasWidth = Math.max(1000, Math.min(4000, canvasWidth))
-    canvasHeight = Math.max(1000, Math.min(4000, canvasHeight))
+    canvasWidth = Math.max(1500, Math.min(6000, canvasWidth))
+    canvasHeight = Math.max(1500, Math.min(6000, canvasHeight))
 
     console.log('📐 Tamaño del canvas:', { width: canvasWidth, height: canvasHeight })
 
@@ -429,22 +425,19 @@ export default function Mapito({ user }) {
     let cleanupFunctions = []
 
     try {
-      // Paso 1: Crear contenedor (10%)
-      setExportProgress(10)
+      // Paso 1: Crear contenedor VISIBLE (5%)
+      setExportProgress(5)
       setExportStatus('Preparando canvas...')
 
+      // IMPORTANTE: El div debe estar VISIBLE para que Leaflet renderice
       tempDiv = document.createElement('div')
       tempDiv.id = `mapito-export-${Date.now()}`
       tempDiv.style.width = `${canvasWidth}px`
       tempDiv.style.height = `${canvasHeight}px`
-      tempDiv.style.position = 'absolute'
-      // Posicionar fuera del viewport pero no tan lejos
-      tempDiv.style.left = '-5000px'
+      tempDiv.style.position = 'fixed'
+      tempDiv.style.left = '0'
       tempDiv.style.top = '0'
-      // IMPORTANTE: opacity 1 para que el navegador renderice completamente
-      tempDiv.style.opacity = '1'
-      tempDiv.style.zIndex = '1'
-      // Fondo según configuración
+      tempDiv.style.zIndex = '99999'  // Al frente para que renderice
       tempDiv.style.backgroundColor = showBasemap ? '#f8f9fa' : 'transparent'
       tempDiv.style.pointerEvents = 'none'
       tempDiv.style.overflow = 'hidden'
@@ -456,15 +449,14 @@ export default function Mapito({ user }) {
         }
       })
 
-      // Paso 2: Crear mapa (30%)
-      setExportProgress(30)
+      // Paso 2: Crear mapa (10%)
+      setExportProgress(10)
       setExportStatus('Inicializando mapa...')
 
-      // Usar SVG (preferCanvas: false) - más confiable para captura sin tiles
       tempMap = L.map(tempDiv.id, {
         zoomControl: false,
         attributionControl: false,
-        preferCanvas: false  // SVG es más confiable sin tiles
+        preferCanvas: false
       }).setView([-9.2, -75.0], 5)
 
       cleanupFunctions.push(() => {
@@ -485,26 +477,20 @@ export default function Mapito({ user }) {
         throw new Error('Leaflet.getContainer() devolvió null')
       }
 
-      // Establecer fondo del contenedor
       leafletContainer.style.backgroundColor = showBasemap ? '#f8f9fa' : 'transparent'
 
-      // NO agregamos TileLayer - esto evita completamente el problema CORS
-      // El mapa base solo se ve en la previsualización
-
-      // Paso 3: Agregar GeoJSON (50%)
+      // NO agregamos TileLayer para evitar CORS
       setExportProgress(50)
+
+      // Paso 3: Agregar GeoJSON (60%)
+      setExportProgress(60)
       setExportStatus('Renderizando áreas...')
 
       const dataToRender = includeContext ? geoData : selectedData
 
-      console.log('🗺️ Agregando GeoJSON:', {
-        featuresCount: dataToRender.features.length,
-        includeContext,
-        colorSelected,
-        colorGeneral
-      })
+      console.log('🗺️ Agregando GeoJSON:', { featuresCount: dataToRender.features.length })
 
-      const geoJsonLayer = L.geoJSON(dataToRender, {
+      L.geoJSON(dataToRender, {
         style: (feature) => {
           if (includeContext) {
             const selected = isSelected(feature)
@@ -525,8 +511,6 @@ export default function Mapito({ user }) {
         }
       }).addTo(tempMap)
 
-      console.log('✅ GeoJSON agregado, layers:', geoJsonLayer.getLayers().length)
-
       // Paso 4: Ajustar bounds (70%)
       setExportProgress(70)
       setExportStatus('Ajustando vista...')
@@ -535,7 +519,7 @@ export default function Mapito({ user }) {
       const fitBounds = fitBoundsSource.getBounds()
 
       tempMap.fitBounds(fitBounds, {
-        padding: [150, 150],
+        padding: [200, 200],
         maxZoom: 18
       })
 
@@ -545,12 +529,8 @@ export default function Mapito({ user }) {
       setExportProgress(80)
       setExportStatus('Esperando renderizado...')
 
-      // Dar tiempo para que SVG se renderice completamente
-      await new Promise(resolve => setTimeout(resolve, 800))
+      await new Promise(resolve => setTimeout(resolve, 500))
       tempMap.invalidateSize()
-
-      // Segundo wait para asegurar renderizado
-      await new Promise(resolve => setTimeout(resolve, 200))
 
       // Paso 6: Capturar imagen (90%)
       setExportProgress(90)
@@ -561,30 +541,28 @@ export default function Mapito({ user }) {
         throw new Error('El contenedor desapareció')
       }
 
-      // Verificar que hay contenido SVG
-      const svgElements = containerToCapture.querySelectorAll('svg path')
-      console.log('📸 Capturando:', {
-        width: containerToCapture.offsetWidth,
-        height: containerToCapture.offsetHeight,
-        svgPaths: svgElements.length,
-        hasContent: svgElements.length > 0
-      })
+      console.log('📸 Capturando contenedor visible')
 
-      // Capturar con toCanvas - ahora sin tiles no hay problema CORS
+      // Capturar con toCanvas
       const canvas = await toCanvas(containerToCapture, {
         quality: 1.0,
-        pixelRatio: 2,  // Mayor resolución
+        pixelRatio: 1,
         backgroundColor: showBasemap ? '#f8f9fa' : null,
         cacheBust: true,
         skipFonts: true,
         width: canvasWidth,
-        height: canvasHeight
+        height: canvasHeight,
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        }
       })
 
-      console.log('🎨 Canvas generado:', {
-        width: canvas.width,
-        height: canvas.height
-      })
+      console.log('🎨 Canvas generado:', { width: canvas.width, height: canvas.height })
+
+      // Ahora esconder el div (ya capturamos)
+      tempDiv.style.opacity = '0'
+      tempDiv.style.zIndex = '-9999'
 
       // Paso 7: Optimizar (95%)
       setExportProgress(95)
