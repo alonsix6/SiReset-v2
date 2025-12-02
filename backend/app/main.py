@@ -46,6 +46,44 @@ async def log_requests(request: Request, call_next):
 async def health_check():
     return {"status": "healthy", "service": "sireset-api", "version": "2.0.0"}
 
+# Endpoint de diagnóstico (sin autenticación para debug)
+@app.get("/api/diagnostic")
+async def diagnostic():
+    """Endpoint de diagnóstico para verificar configuración"""
+    from app.core.database import engine
+    from sqlalchemy import text
+
+    result = {
+        "config": {
+            "supabase_url": bool(settings.SUPABASE_URL),
+            "supabase_anon_key": bool(settings.SUPABASE_ANON_KEY),
+            "supabase_jwt_secret": bool(settings.SUPABASE_JWT_SECRET),
+            "supabase_jwt_secret_length": len(settings.SUPABASE_JWT_SECRET) if settings.SUPABASE_JWT_SECRET else 0,
+            "database_url": bool(settings.DATABASE_URL),
+            "database_url_preview": settings.DATABASE_URL[:50] + "..." if settings.DATABASE_URL else None,
+            "secret_key": bool(settings.SECRET_KEY),
+            "environment": settings.ENVIRONMENT,
+        },
+        "database": {
+            "connected": False,
+            "error": None
+        }
+    }
+
+    # Probar conexión a base de datos
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            result["database"]["connected"] = True
+
+            # Contar usuarios
+            user_count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
+            result["database"]["user_count"] = user_count
+    except Exception as e:
+        result["database"]["error"] = str(e)
+
+    return result
+
 # Incluir routers de módulos
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(mougli.router, prefix="/api/mougli", tags=["mougli"])
