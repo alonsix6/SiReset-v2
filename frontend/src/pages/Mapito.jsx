@@ -437,12 +437,14 @@ export default function Mapito({ user }) {
       tempDiv.id = `mapito-export-${Date.now()}`
       tempDiv.style.width = `${canvasWidth}px`
       tempDiv.style.height = `${canvasHeight}px`
-      tempDiv.style.position = 'fixed'
-      tempDiv.style.left = '0'
+      tempDiv.style.position = 'absolute'
+      // Posicionar fuera del viewport pero no tan lejos
+      tempDiv.style.left = '-5000px'
       tempDiv.style.top = '0'
-      tempDiv.style.opacity = '0.01'
-      tempDiv.style.zIndex = '-9999'
-      // Fondo blanco si showBasemap, transparente si no
+      // IMPORTANTE: opacity 1 para que el navegador renderice completamente
+      tempDiv.style.opacity = '1'
+      tempDiv.style.zIndex = '1'
+      // Fondo según configuración
       tempDiv.style.backgroundColor = showBasemap ? '#f8f9fa' : 'transparent'
       tempDiv.style.pointerEvents = 'none'
       tempDiv.style.overflow = 'hidden'
@@ -495,7 +497,14 @@ export default function Mapito({ user }) {
 
       const dataToRender = includeContext ? geoData : selectedData
 
-      L.geoJSON(dataToRender, {
+      console.log('🗺️ Agregando GeoJSON:', {
+        featuresCount: dataToRender.features.length,
+        includeContext,
+        colorSelected,
+        colorGeneral
+      })
+
+      const geoJsonLayer = L.geoJSON(dataToRender, {
         style: (feature) => {
           if (includeContext) {
             const selected = isSelected(feature)
@@ -503,18 +512,20 @@ export default function Mapito({ user }) {
               fillColor: selected ? colorSelected : colorGeneral,
               fillOpacity: selected ? 0.95 : 0.85,
               color: showBorders ? colorBorder : (selected ? colorSelected : colorGeneral),
-              weight: showBorders ? grosorBorde : 0
+              weight: showBorders ? grosorBorde : 0.5
             }
           } else {
             return {
               fillColor: colorSelected,
               fillOpacity: 0.95,
               color: showBorders ? colorBorder : colorSelected,
-              weight: showBorders ? grosorBorde : 0
+              weight: showBorders ? grosorBorde : 0.5
             }
           }
         }
       }).addTo(tempMap)
+
+      console.log('✅ GeoJSON agregado, layers:', geoJsonLayer.getLayers().length)
 
       // Paso 4: Ajustar bounds (70%)
       setExportProgress(70)
@@ -535,8 +546,11 @@ export default function Mapito({ user }) {
       setExportStatus('Esperando renderizado...')
 
       // Dar tiempo para que SVG se renderice completamente
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 800))
       tempMap.invalidateSize()
+
+      // Segundo wait para asegurar renderizado
+      await new Promise(resolve => setTimeout(resolve, 200))
 
       // Paso 6: Capturar imagen (90%)
       setExportProgress(90)
@@ -547,9 +561,13 @@ export default function Mapito({ user }) {
         throw new Error('El contenedor desapareció')
       }
 
+      // Verificar que hay contenido SVG
+      const svgElements = containerToCapture.querySelectorAll('svg path')
       console.log('📸 Capturando:', {
         width: containerToCapture.offsetWidth,
-        height: containerToCapture.offsetHeight
+        height: containerToCapture.offsetHeight,
+        svgPaths: svgElements.length,
+        hasContent: svgElements.length > 0
       })
 
       // Capturar con toCanvas - ahora sin tiles no hay problema CORS
