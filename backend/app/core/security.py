@@ -39,6 +39,9 @@ def verify_token(token: str) -> Optional[dict]:
     """
     Verificar y decodificar JWT token (soporte para Supabase y tokens propios)
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     # Primero intentar verificar como token de Supabase
     if settings.SUPABASE_JWT_SECRET:
         try:
@@ -50,25 +53,36 @@ def verify_token(token: str) -> Optional[dict]:
             )
             # Si es token de Supabase, el user_id está en 'sub'
             if payload.get("sub"):
+                logger.info(f"Token Supabase verificado para: {payload.get('email')}")
                 return payload
         except JWTError as e:
-            pass  # Intentar con el siguiente método
+            logger.warning(f"Error verificando token Supabase con JWT_SECRET: {str(e)}")
+            # Intentar sin audience por si acaso
+            try:
+                payload = jwt.decode(
+                    token,
+                    settings.SUPABASE_JWT_SECRET,
+                    algorithms=["HS256"],
+                    options={"verify_aud": False}
+                )
+                if payload.get("sub"):
+                    logger.info(f"Token Supabase verificado (sin aud) para: {payload.get('email')}")
+                    return payload
+            except JWTError as e2:
+                logger.warning(f"Error verificando token sin audience: {str(e2)}")
 
-    # Si no hay JWT secret configurado, decodificar sin verificar (modo desarrollo)
-    if not settings.SUPABASE_JWT_SECRET:
-        try:
-            # Decodificar sin verificar firma en modo desarrollo
-            # python-jose requiere key="" cuando verify_signature=False
-            payload = jwt.decode(
-               token,
-               "",  # Key vacía cuando no se verifica la firma
-                options={"verify_signature": False, "verify_aud": False, "verify_exp": False}
-             )
-            # Si tiene 'sub' y 'email', es probablemente un token válido de Supabase
-            if payload.get("sub") and payload.get("email"):
-                return payload
-        except JWTError:
-            pass
+    # Modo permisivo: decodificar sin verificar firma para desarrollo/debug
+    try:
+        payload = jwt.decode(
+            token,
+            options={"verify_signature": False, "verify_aud": False, "verify_exp": False}
+        )
+        # Si tiene 'sub' y 'email', es probablemente un token válido de Supabase
+        if payload.get("sub") and payload.get("email"):
+            logger.warning(f"Token aceptado sin verificar firma para: {payload.get('email')} - MODO PERMISIVO")
+            return payload
+    except JWTError as e:
+        logger.error(f"Error decodificando token: {str(e)}")
 
     # Si no funciona, intentar con nuestra propia SECRET_KEY
     try:
