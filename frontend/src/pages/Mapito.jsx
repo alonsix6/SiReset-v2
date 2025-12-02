@@ -479,11 +479,56 @@ export default function Mapito({ user }) {
 
       leafletContainer.style.backgroundColor = showBasemap ? '#f8f9fa' : 'transparent'
 
-      // NO agregamos TileLayer para evitar CORS
+      // Paso 3: Agregar TileLayer si showBasemap está activo (20-50%)
+      if (showBasemap) {
+        setExportProgress(20)
+        setExportStatus('Cargando mapa base...')
+
+        // Usar CartoDB tiles con crossOrigin para CORS
+        const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          crossOrigin: 'anonymous',
+          subdomains: 'abcd'
+        })
+
+        // Esperar a que los tiles carguen
+        await new Promise((resolve) => {
+          let tilesLoaded = 0
+          let tilesToLoad = 0
+          let resolved = false
+
+          tileLayer.on('tileloadstart', () => tilesToLoad++)
+          tileLayer.on('tileload', () => {
+            tilesLoaded++
+            if (!resolved && tilesLoaded >= tilesToLoad && tilesToLoad > 0) {
+              resolved = true
+              resolve()
+            }
+          })
+          tileLayer.on('tileerror', () => {
+            tilesLoaded++
+            if (!resolved && tilesLoaded >= tilesToLoad && tilesToLoad > 0) {
+              resolved = true
+              resolve()
+            }
+          })
+
+          tileLayer.addTo(tempMap)
+
+          // Timeout de seguridad
+          setTimeout(() => {
+            if (!resolved) {
+              resolved = true
+              resolve()
+            }
+          }, 5000)
+        })
+      }
+
       setExportProgress(50)
 
-      // Paso 3: Agregar GeoJSON (60%)
-      setExportProgress(60)
+      // Paso 4: Agregar GeoJSON (55%)
+      setExportProgress(55)
       setExportStatus('Renderizando áreas...')
 
       const dataToRender = includeContext ? geoData : selectedData
