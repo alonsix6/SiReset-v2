@@ -75,6 +75,7 @@ def verify_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(
             token,
+            key="",  # Key vacía requerida por python-jose
             options={"verify_signature": False, "verify_aud": False, "verify_exp": False}
         )
         # Si tiene 'sub' y 'email', es probablemente un token válido de Supabase
